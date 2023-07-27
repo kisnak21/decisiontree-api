@@ -1,11 +1,12 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from firebase import firebase
+from datetime import datetime
 import pandas as pd
 import numpy as np
 import os
 
-# data dari firebase
+# data dari firebase langsung
 firebase = firebase.FirebaseApplication(
     'https://smartlamp-48d48-default-rtdb.firebaseio.com/', None)
 result = firebase.get('/Data', '')
@@ -40,131 +41,177 @@ mean_time = data['Waktu'].mean()
 data['Waktu'].fillna(mean_time, inplace=True)
 
 # Mengganti nilai hidup dan mati
-data['kamar'] = data['kamar'].apply(lambda x: 1 if x == 'hidup' else 2)
-data['kamar2'] = data['kamar2'].apply(lambda x: 1 if x == 'hidup' else 2)
-data['teras'] = data['teras'].apply(lambda x: 1 if x == 'hidup' else 2)
-data['dapur'] = data['dapur'].apply(lambda x: 1 if x == 'hidup' else 2)
-data['toilet'] = data['toilet'].apply(lambda x: 1 if x == 'hidup' else 2)
-data['ruangtamu'] = data['ruangtamu'].apply(lambda x: 1 if x == 'hidup' else 2)
+data['kamar'] = data['kamar'].map({'mati': 1, 'hidup': 2})
+data['kamar2'] = data['kamar2'].map({'mati': 1, 'hidup': 2})
+data['teras'] = data['teras'].map({'mati': 1, 'hidup': 2})
+data['dapur'] = data['dapur'].map({'mati': 1, 'hidup': 2})
+data['toilet'] = data['toilet'].map({'mati': 1, 'hidup': 2})
+data['ruangtamu'] = data['ruangtamu'].map({'mati': 1, 'hidup': 2})
 
 
 # Bagi dataset 80:20
 train_data = data.sample(frac=0.8, random_state=42)
 test_data = data.drop(train_data.index)
 
-# Menghitung entropy
+# question node
 
 
-def entropy(data, column):
-    labels = data[column]
-    unique_labels, label_counts = np.unique(labels, return_counts=True)
-    probabilities = label_counts / len(labels)
-    entropy = -np.sum(probabilities * np.log2(probabilities + 1e-9))
-    return entropy
+class CreateQuestion:
+    def __init__(self, column, value):
+        self.column = column
+        self.value = value
+
+    def check(self, data):
+        val = data[self.column]
+        return val >= self.value
+
+    def __repr__(self):
+        return "Is %s >= %s?" % (self.column, str(self.value))
+
+# Decision tree class
 
 
-# Menghitung information gain
+class DecisionTree:
+    def __init__(self):
+        self.tree = None
+
+    def entropy(self, y):
+        _, counts = np.unique(y, return_counts=True)
+        probabilities = counts / len(y)
+        entropy = -np.sum(probabilities * np.log2(probabilities + 1e-9))
+        return entropy
+
+    def information_gain(self, X, y, feature):
+        entropy_before = self.entropy(y)
+        unique_values = np.unique(X[feature])
+        weighted_entropy = 0
+
+        for value in unique_values:
+            subset_indices = X[feature] == value
+            subset_y = y[subset_indices]
+            subset_weight = len(subset_indices) / len(y)
+            subset_entropy = self.entropy(subset_y)
+            weighted_entropy += subset_weight * subset_entropy
+
+        information_gain = entropy_before - weighted_entropy
+        return information_gain
+
+    def gain_ratio(self, X, y, feature):
+        information_gain = self.information_gain(X, y, feature)
+        split_info = self.entropy(X[feature])
+        if split_info == 0:
+            return 0
+        gain_ratio = information_gain / split_info
+        return gain_ratio
+
+    def find_best_attribute(self, X, y):
+        best_gain_ratio = -np.inf
+        best_attribute = None
+
+        for attribute in X.columns:
+            gain_ratio = self.gain_ratio(X, y, attribute)
+            if gain_ratio > best_gain_ratio:
+                best_gain_ratio = gain_ratio
+                best_attribute = attribute
+
+        return best_attribute
+
+    def build_decision_tree(self, X, y):
+        if len(np.unique(y)) == 1:
+            return {'label': y.iloc[0]}
+        if X.empty or len(X.columns) == 0:
+            majority_label = np.argmax(np.bincount(y))
+            return {'label': majority_label}
+
+        best_attribute = self.find_best_attribute(X, y)
+        if best_attribute is None:
+            majority_label = np.argmax(np.bincount(y))
+            return {'label': majority_label}
+
+        tree = {'attribute': best_attribute, 'children': {}}
+        unique_values = np.unique(X[best_attribute])
+
+        for value in unique_values:
+            subset_indices = X[best_attribute] == value
+            subset_X = X.loc[subset_indices].drop(columns=[best_attribute])
+            subset_y = y[subset_indices]
+            tree['children'][value] = self.build_decision_tree(
+                subset_X, subset_y)
+
+        return tree
+
+    def fit(self, X, y):
+        self.tree = self.build_decision_tree(X, y)
+
+    def predict_instance(self, instance, node):
+        if 'label' in node:
+            return node['label']
+        attribute = node['attribute']
+        value = instance[attribute]
+
+        if value in node['children']:
+            child = node['children'][value]
+            return self.predict_instance(instance, child)
+        else:
+            return None
+
+    def predict(self, X):
+        predictions = []
+        for _, instance in X.iterrows():
+            predictions.append(self.predict_instance(instance, self.tree))
+        return predictions
+
+    def print_rules(self, node=None, question='', rules_data=None):
+        if node is None:
+            node = self.tree
+
+        if rules_data is None:
+            rules_data = []
+
+        if 'label' in node:
+            rules_data.append({'Question': question, 'Label': node['label']})
+            return
+
+        attribute = node['attribute']
+        for value, child_node in node['children'].items():
+            q = CreateQuestion(attribute, value)
+            self.print_rules(child_node, question +
+                             str(q), rules_data)
+
+        return rules_data
+
+    def print_tree(self, node=None, indent=0, tree_data=None):
+        if node is None:
+            node = self.tree
+
+        if tree_data is None:
+            tree_data = []
+
+        if 'label' in node:
+            tree_data.append(
+                {'Node': 'Label', 'Value': node['label'], 'Indent': indent})
+            return
+
+        attribute = node['attribute']
+        tree_data.append(
+            {'Node': 'Attribute', 'Value': attribute, 'Indent': indent})
+
+        for value, child_node in node['children'].items():
+            question = CreateQuestion(attribute, value)
+            tree_data.append(
+                {'Node': 'Question', 'Value': repr(question), 'Indent': indent + 1})
+            self.print_tree(child_node, indent + 2, tree_data)
+
+        return tree_data
+
+# akurasi
 
 
-def information_gain(data, feature, column):
-    total_entropy = entropy(data, column)
-    feature_values = data[feature]
-    unique_values = np.unique(feature_values)
-    weighted_entropy = 0
-
-    for value in unique_values:
-        subset = data[data[feature] == value]
-        subset_entropy = entropy(subset, column)
-        subset_probability = len(subset) / len(data)
-        weighted_entropy += subset_probability * subset_entropy
-
-    information_gain_value = total_entropy - weighted_entropy
-    return information_gain_value
-
-
-# Menghitung gain ratio
-
-
-def gain_ratio(data, feature, column):
-    split_information = 0
-    feature_values = data[feature]
-    unique_values, value_counts = np.unique(feature_values, return_counts=True)
-
-    for value, count in zip(unique_values, value_counts):
-        subset = data[data[feature] == value]
-        subset_probability = len(subset) / len(data)
-        split_information -= subset_probability * \
-            np.log2(subset_probability + 1e-9)
-
-    information_gain_value = information_gain(data, feature, column)
-    gain_ratio_value = information_gain_value / \
-        (split_information + 1e-9) if split_information != 0 else 0
-    return gain_ratio_value
-
-
-# Mencari atribut terbaik untuk splitting menggunakan Gain Ratio
-
-
-def find_best_attribute(data, column):
-    features = data.columns.drop(['Tanggal', column])
-    best_attribute = None
-    best_gain_ratio = -1
-
-    for feature in features:
-        current_gain_ratio = gain_ratio(data, feature, column)
-        if current_gain_ratio > best_gain_ratio:
-            best_gain_ratio = current_gain_ratio
-            best_attribute = feature
-
-    return best_attribute
-
-
-# Membangun pohon keputusan C5.0
-
-
-def build_decision_tree(data, column):
-    labels = data[column]
-
-    if len(np.unique(labels)) == 1:
-        return {'label': labels.iloc[0]}
-
-    if len(data.columns) == 1:
-        majority_label = labels.mode()[0]
-        return {'label': majority_label}
-
-    best_attribute = find_best_attribute(data, column)
-    if best_attribute is None:
-        majority_label = labels.mode()[0]
-        return {'label': majority_label}
-
-    tree = {'attribute': best_attribute, 'children': {}}
-    unique_values = np.unique(data[best_attribute])
-
-    for value in unique_values:
-        subset = data[data[best_attribute] == value].drop(
-            columns=[best_attribute])
-        tree['children'][value] = build_decision_tree(subset, column)
-
-    return tree
-
-
-# Prediksi menggunakan pohon keputusan
-
-
-def predict(tree, sample, column):
-    if 'label' in tree:
-        return tree['label']
-    attribute = tree['attribute']
-    value = sample[attribute]
-
-    if value in tree['children']:
-        child = tree['children'][value]
-        return predict(child, sample, column)
-    else:
-        return None
-
-
-# Menghitung confusion matrix
+def calculate_accuracy(predictions, labels):
+    correct_count = sum(predictions == labels)
+    total_count = len(predictions)
+    accuracy = correct_count / total_count
+    return accuracy
 
 
 def confusion_matrix(y_true, y_pred, labels):
@@ -180,16 +227,11 @@ def confusion_matrix(y_true, y_pred, labels):
     return cm
 
 
-# Menghitung recall
-
-
 def recall(cm, label_idx):
     true_positives = cm[label_idx, label_idx]
     total_positives = np.sum(cm[label_idx, :])
     recall_value = true_positives / total_positives if total_positives != 0 else 0
     return recall_value
-
-# Menghitung precision
 
 
 def precision(cm, label_idx):
@@ -200,65 +242,82 @@ def precision(cm, label_idx):
     return precision_value
 
 
-# Memperoleh akurasi prediksi pada data uji
+def generate_new_data():
+    current_time = datetime.now().time().strftime('%H:%M:%S')
+    new_data = pd.DataFrame({'Waktu': [current_time]})
+    new_data['Waktu'] = pd.to_datetime(
+        new_data['Waktu'], format='%H:%M:%S', errors='coerce').dt.time
+    new_data['Waktu'] = new_data['Waktu'].apply(
+        lambda x: x.hour * 60 + x.minute)
+    new_data['Waktu'].fillna(mean_time, inplace=True)
+    return new_data
 
 
-def get_accuracy(tree, data, column):
-    predicted_labels = data.apply(lambda x: predict(tree, x, column), axis=1)
-    actual_labels = data[column]
-    accuracy = (predicted_labels == actual_labels).mean()
-    return accuracy
+# Membangun pohon keputusan C5.0 untuk setiap ruangan
+decision_tree_kamar = DecisionTree()
+decision_tree_kamar.fit(train_data[['Waktu']], train_data['kamar'])
 
+decision_tree_kamar2 = DecisionTree()
+decision_tree_kamar2.fit(train_data[['Waktu']], train_data['kamar2'])
 
-# Menghitung F1-Score
+decision_tree_teras = DecisionTree()
+decision_tree_teras.fit(train_data[['Waktu']], train_data['teras'])
 
+decision_tree_dapur = DecisionTree()
+decision_tree_dapur.fit(train_data[['Waktu']], train_data['dapur'])
 
-def f1_score(cm, label_idx):
-    precision_value = precision(cm, label_idx)
-    recall_value = recall(cm, label_idx)
-    f1_score_value = 2 * (precision_value * recall_value) / (precision_value +
-                                                             recall_value) if (precision_value + recall_value) != 0 else 0
-    return f1_score_value
+decision_tree_toilet = DecisionTree()
+decision_tree_toilet.fit(train_data[['Waktu']], train_data['toilet'])
 
+decision_tree_ruangtamu = DecisionTree()
+decision_tree_ruangtamu.fit(train_data[['Waktu']], train_data['ruangtamu'])
 
-# Membuat rules dari pohon keputusan
+# Mengabaikan data yang tidak diketahui pada setiap kolom target
+test_data_kamar = test_data[test_data['kamar'] != 'unknown']
+test_data_kamar2 = test_data[test_data['kamar2'] != 'unknown']
+test_data_teras = test_data[test_data['teras'] != 'unknown']
+test_data_dapur = test_data[test_data['dapur'] != 'unknown']
+test_data_toilet = test_data[test_data['toilet'] != 'unknown']
+test_data_ruangtamu = test_data[test_data['ruangtamu'] != 'unknown']
 
-
-def get_rules(tree, column, conditions=None):
-    rules = []
-
-    if conditions is None:
-        conditions = []
-
-    if 'label' in tree:
-        rule = {
-            'conditions': conditions,
-            'decision': tree['label']
-            # 'decision': 1 if tree['label'] == 'hidup' else 2
-        }
-        rules.append(rule)
-        return rules
-
-    attribute = tree['attribute']
-    for value, child in tree['children'].items():
-        new_conditions = conditions + ["{} == {}".format(attribute, value)]
-        rules.extend(get_rules(child, column, new_conditions))
-
-    return rules
-
+# Melakukan prediksi pada data uji yang telah difilter
+predictions_kamar = decision_tree_kamar.predict(test_data_kamar[['Waktu']])
+predictions_kamar2 = decision_tree_kamar2.predict(test_data_kamar2[['Waktu']])
+predictions_teras = decision_tree_teras.predict(test_data_teras[['Waktu']])
+predictions_dapur = decision_tree_dapur.predict(test_data_dapur[['Waktu']])
+predictions_toilet = decision_tree_toilet.predict(test_data_toilet[['Waktu']])
+predictions_ruangtamu = decision_tree_ruangtamu.predict(
+    test_data_ruangtamu[['Waktu']])
 
 # Menghitung akurasi pada data uji
-for column in ['kamar', 'kamar2', 'teras', 'dapur', 'toilet', 'ruangtamu']:
-    decision_tree = build_decision_tree(train_data, column)
-    accuracy = get_accuracy(decision_tree, test_data, column)
-    print("Accuracy ({}) : {:.2f}".format(column, accuracy))
+accuracy_kamar = calculate_accuracy(predictions_kamar, test_data['kamar'])
+accuracy_kamar2 = calculate_accuracy(predictions_kamar2, test_data['kamar2'])
+accuracy_teras = calculate_accuracy(predictions_teras, test_data['teras'])
+accuracy_dapur = calculate_accuracy(predictions_dapur, test_data['dapur'])
+accuracy_toilet = calculate_accuracy(predictions_toilet, test_data['toilet'])
+accuracy_ruangtamu = calculate_accuracy(
+    predictions_ruangtamu, test_data['ruangtamu'])
 
+# akurasi dataframe
+accuracies = {
+    'Ruangan': ['Kamar', 'Kamar2', 'Teras', 'Dapur', 'Toilet', 'RuangTamu'],
+    'Accuracy': [
+        accuracy_kamar, accuracy_kamar2, accuracy_teras,
+        accuracy_dapur, accuracy_toilet, accuracy_ruangtamu
+    ]
+}
 
+accuracy_df = pd.DataFrame(accuracies)
+print(accuracy_df)
+print()
+
+# recall, precision dan cm
 for column in ['kamar', 'kamar2', 'teras', 'dapur', 'toilet', 'ruangtamu']:
-    decision_tree = build_decision_tree(train_data, column)
+    decision_tree = DecisionTree()
+    decision_tree.fit(train_data[['Waktu']], train_data[column])
     y_test = test_data[column]
-    y_pred = test_data.apply(lambda x: predict(
-        decision_tree, x, column), axis=1)
+    y_pred = test_data.apply(
+        lambda x: decision_tree.predict_instance(x, decision_tree.tree), axis=1)
     labels = np.unique(y_test)
     cm = confusion_matrix(y_test, y_pred, labels)
 
@@ -266,113 +325,132 @@ for column in ['kamar', 'kamar2', 'teras', 'dapur', 'toilet', 'ruangtamu']:
     print(cm)
     print()
 
+    recall_values = []
+    precision_values = []
     for i, label in enumerate(labels):
         r = recall(cm, i)
         p = precision(cm, i)
+        recall_values.append(r)
+        precision_values.append(p)
+
         print("Label: {} ({})".format(label, column))
         print("Recall: {:.2f}".format(r))
         print("Precision: {:.2f}".format(p))
         print()
 
-for column in ['kamar', 'kamar2', 'teras', 'dapur', 'toilet', 'ruangtamu']:
-    decision_tree = build_decision_tree(train_data, column)
-    rules = get_rules(decision_tree, column)
+# Mencetak rules untuk setiap ruangan
+rules_data_kamar = decision_tree_kamar.print_rules()
+print("Rules Kamar:")
+print(rules_data_kamar)
+print()
 
-    print("Rules ({}) :".format(column))
-    for i, rule in enumerate(rules):
-        print("Rule {}: {}".format(i+1, rule))
-    print()
+rules_data_kamar2 = decision_tree_kamar2.print_rules()
 
+print("Rules Kamar2:")
+print(rules_data_kamar2)
+print()
 
-# Membuat aturan dari pohon keputusan
-print("Rules:")
-rl = get_rules(decision_tree, column)
-print(rl)
+rules_data_teras = decision_tree_teras.print_rules()
+
+print("Rules Teras:")
+print(rules_data_teras)
+print()
+
+rules_data_dapur = decision_tree_dapur.print_rules()
+print("Rules Dapur:")
+print(rules_data_dapur)
+print()
+
+rules_data_toilet = decision_tree_toilet.print_rules()
+
+print("Rules Toilet:")
+print(rules_data_toilet)
+print()
+
+rules_data_ruangtamu = decision_tree_ruangtamu.print_rules()
+print("Rules RuangTamu:")
+print(rules_data_ruangtamu)
+print()
+
 
 app = Flask(__name__)
 CORS(app)
 app.config['CORS_HEADER'] = 'Content-Type'
 
-# Endpoint untuk menghitung entropy
+decision_tree_kamar = DecisionTree()
+decision_tree_kamar.fit(train_data[['Waktu']], train_data['kamar'])
 
+decision_tree_kamar2 = DecisionTree()
+decision_tree_kamar2.fit(train_data[['Waktu']], train_data['kamar2'])
 
-@app.route('/api/entropy')
-def calculate_entropy():
-    entropy_values = {}
-    for column in ['kamar', 'kamar2', 'teras', 'dapur', 'toilet', 'ruangtamu']:
-        entropy_value = entropy(data, column)
-        entropy_values[column] = entropy_value
-    return jsonify(entropy=entropy_values)
+decision_tree_teras = DecisionTree()
+decision_tree_teras.fit(train_data[['Waktu']], train_data['teras'])
 
+decision_tree_dapur = DecisionTree()
+decision_tree_dapur.fit(train_data[['Waktu']], train_data['dapur'])
 
-# Endpoint untuk menghitung information gain
+decision_tree_toilet = DecisionTree()
+decision_tree_toilet.fit(train_data[['Waktu']], train_data['toilet'])
 
-
-@app.route('/api/information_gain')
-def calculate_information_gain():
-    # Mendapatkan parameter 'feature' dari URL
-    feature = request.args.get('feature')
-    information_gain_value = information_gain(data, feature, column)
-    return jsonify(information_gain=information_gain_value)
-
-# Endpoint untuk menghitung gain ratio
-
-
-@app.route('/api/gain_ratio')
-def calculate_gain_ratio():
-    # Mendapatkan parameter 'feature' dari URL
-    feature = request.args.get('feature')
-    gain_ratio_value = gain_ratio(data, feature, column)
-    return jsonify(gain_ratio=gain_ratio_value)
-
-# Endpoint untuk mencari atribut terbaik
-
-
-@app.route('/api/best_attribute')
-def find_best_attribute_endpoint():
-    best_attribute = find_best_attribute(data)
-    return jsonify(best_attribute=best_attribute)
-
-# Buat endpoint untuk menghitung akurasi
+decision_tree_ruangtamu = DecisionTree()
+decision_tree_ruangtamu.fit(train_data[['Waktu']], train_data['ruangtamu'])
 
 
 @app.route('/api/accuracy')
-def calculate_accuracy():
-    accuracy_values = {}
-    for column in ['kamar', 'kamar2', 'teras', 'dapur', 'toilet', 'ruangtamu']:
-        decision_tree = build_decision_tree(train_data, column)
-        accuracy = get_accuracy(decision_tree, test_data, column)
-        accuracy_percentage = "{:.2f}".format(accuracy, column)
-        accuracy_values[column] = accuracy_percentage
-    return jsonify(accuracy=accuracy_values)
+def get_accuracy_all_rooms():
+    accuracies = {
+        'kamar': calculate_accuracy(decision_tree_kamar.predict(test_data_kamar[['Waktu']]), test_data_kamar['kamar']),
+        'kamar2': calculate_accuracy(decision_tree_kamar2.predict(test_data_kamar2[['Waktu']]), test_data_kamar2['kamar2']),
+        'teras': calculate_accuracy(decision_tree_teras.predict(test_data_teras[['Waktu']]), test_data_teras['teras']),
+        'dapur': calculate_accuracy(decision_tree_dapur.predict(test_data_dapur[['Waktu']]), test_data_dapur['dapur']),
+        'toilet': calculate_accuracy(decision_tree_toilet.predict(test_data_toilet[['Waktu']]), test_data_toilet['toilet']),
+        'ruangtamu': calculate_accuracy(decision_tree_ruangtamu.predict(test_data_ruangtamu[['Waktu']]), test_data_ruangtamu['ruangtamu']),
+    }
+    return jsonify(accuracies)
+
+# helper
 
 
-# rules pohon
+def convert_to_python_int(data):
+    if isinstance(data, np.int64):
+        return int(data)
+    elif isinstance(data, dict):
+        return {key: convert_to_python_int(value) for key, value in data.items()}
+    elif isinstance(data, list):
+        return [convert_to_python_int(item) for item in data]
+    else:
+        return data
 
 
 @app.route('/api/rules')
-def show_rules():
-    rules = {}
-    for column in ['kamar', 'kamar2', 'teras', 'dapur', 'toilet', 'ruangtamu']:
-        decision_tree = build_decision_tree(train_data, column)
-        column_rules = get_rules(decision_tree, column)
-        formatted_rules = []
-        for i, rule in enumerate(column_rules):
-            formatted_rules.append("Rule {}: {}".format(i+1, rule))
-        rules[column] = formatted_rules
-    return jsonify(rules=rules)
+def get_rules_all_rooms():
+    rules = {
+        'kamar': convert_to_python_int(decision_tree_kamar.print_rules()),
+        'kamar2': convert_to_python_int(decision_tree_kamar2.print_rules()),
+        'teras': convert_to_python_int(decision_tree_teras.print_rules()),
+        'dapur': convert_to_python_int(decision_tree_dapur.print_rules()),
+        'toilet': convert_to_python_int(decision_tree_toilet.print_rules()),
+        'ruangtamu': convert_to_python_int(decision_tree_ruangtamu.print_rules()),
+    }
+    return jsonify(rules)
 
 
+# Endpoint to display accuracy, precision, recall, and decision tree rules for each room
 @app.route('/api/result')
 def show_result():
     result = {}
     for column in ['kamar', 'kamar2', 'teras', 'dapur', 'toilet', 'ruangtamu']:
-        decision_tree = build_decision_tree(train_data, column)
+        decision_tree = DecisionTree()
+        decision_tree.fit(train_data[['Waktu']], train_data[column])
         y_test = test_data[column]
-        y_pred = test_data.apply(lambda x: predict(
-            decision_tree, x, column), axis=1)
+        y_pred = test_data.apply(
+            lambda x: decision_tree.predict_instance(x, decision_tree.tree), axis=1)
         labels = np.unique(y_test)
         cm = confusion_matrix(y_test, y_pred, labels)
+
+        print("Confusion Matrix ({}) :".format(column))
+        print(cm)
+        print()
 
         recall_values = []
         precision_values = []
@@ -382,13 +460,16 @@ def show_result():
             recall_values.append(r)
             precision_values.append(p)
 
-        accuracy = get_accuracy(decision_tree, test_data, column)
-        entropy_value = entropy(data, column)
+            print("Label: {} ({})".format(label, column))
+            print("Recall: {:.2f}".format(r))
+            print("Precision: {:.2f}".format(p))
+            print()
+
+        accuracy = calculate_accuracy(y_pred, y_test)
         precision_value_avg = np.mean(precision_values)
         recall_value_avg = np.mean(recall_values)
 
         result[column] = {
-            'entropy': entropy_value,
             'accuracy': "{:.2f}".format(accuracy),
             'precision on': "{:.2f}".format(precision_values[0]),
             'precision off': "{:.2f}".format(precision_values[1]),
@@ -399,6 +480,80 @@ def show_result():
         }
 
     return jsonify(result=result)
+
+
+@app.route('/api/classify')
+def classify_new_data():
+    new_data = generate_new_data()
+    result = {}
+    for column in ['kamar', 'kamar2', 'teras', 'dapur', 'toilet', 'ruangtamu']:
+        decision_tree = None
+        if column == 'kamar':
+            decision_tree = decision_tree_kamar
+        elif column == 'kamar2':
+            decision_tree = decision_tree_kamar2
+        elif column == 'teras':
+            decision_tree = decision_tree_teras
+        elif column == 'dapur':
+            decision_tree = decision_tree_dapur
+        elif column == 'toilet':
+            decision_tree = decision_tree_toilet
+        elif column == 'ruangtamu':
+            decision_tree = decision_tree_ruangtamu
+
+        if decision_tree:
+            predictions = decision_tree.predict(new_data[['Waktu']])
+            result[column] = [1 if p == 1 else 2 for p in predictions]
+
+    return jsonify(result=result)
+
+
+@app.route('/api/rules/kamar')
+def get_rules_kamar():
+    rules = {
+        'kamar': convert_to_python_int(decision_tree_kamar.print_rules())
+    }
+    return jsonify(rules=rules)
+
+
+@app.route('/api/rules/kamar2')
+def get_rules_kamar2():
+    rules = {
+        'kamar2': convert_to_python_int(decision_tree_kamar2.print_rules())
+    }
+    return jsonify(rules=rules)
+
+
+@app.route('/api/rules/teras')
+def get_rules_teras():
+    rules = {
+        'teras': convert_to_python_int(decision_tree_teras.print_rules())
+    }
+    return jsonify(rules=rules)
+
+
+@app.route('/api/rules/dapur')
+def get_rules_dapur():
+    rules = {
+        'dapur': convert_to_python_int(decision_tree_dapur.print_rules())
+    }
+    return jsonify(rules=rules)
+
+
+@app.route('/api/rules/toilet')
+def get_rules_toilet():
+    rules = {
+        'toilet': convert_to_python_int(decision_tree_toilet.print_rules())
+    }
+    return jsonify(rules=rules)
+
+
+@app.route('/api/rules/ruangtamu')
+def get_rules_ruangtamu():
+    rules = {
+        'ruangtamu': convert_to_python_int(decision_tree_ruangtamu.print_rules())
+    }
+    return jsonify(rules=rules)
 
 
 @app.route('/')
