@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify
 from flask_cors import CORS
 from firebase import firebase
 from datetime import datetime
@@ -39,6 +39,9 @@ data['Waktu'] = data['Waktu'].apply(lambda x: x.hour * 60 + x.minute)
 # Mengisi data waktu yang hilang dengan rata-rata waktu
 mean_time = data['Waktu'].mean()
 data['Waktu'].fillna(mean_time, inplace=True)
+
+# Convert the 'Waktu' column to integers
+data['Waktu'] = data['Waktu'].astype(int)
 
 # Mengganti nilai hidup dan mati
 data['kamar'] = data['kamar'].map({'mati': 1, 'hidup': 2})
@@ -161,7 +164,7 @@ class DecisionTree:
             predictions.append(self.predict_instance(instance, self.tree))
         return predictions
 
-    def print_rules(self, node=None, question='', rules_data=None):
+    def print_rules(self, node=None, condition='', rules_data=None):
         if node is None:
             node = self.tree
 
@@ -169,14 +172,14 @@ class DecisionTree:
             rules_data = []
 
         if 'label' in node:
-            rules_data.append({'Question': question, 'Label': node['label']})
+            rules_data.append({'Condition': condition, 'Label': node['label']})
             return
 
         attribute = node['attribute']
         for value, child_node in node['children'].items():
-            q = CreateQuestion(attribute, value)
-            self.print_rules(child_node, question +
-                             str(q), rules_data)
+            child_condition = f"{attribute} = {value}"
+            self.print_rules(child_node, condition +
+                             child_condition, rules_data)
 
         return rules_data
 
@@ -337,6 +340,7 @@ for column in ['kamar', 'kamar2', 'teras', 'dapur', 'toilet', 'ruangtamu']:
         print("Recall: {:.2f}".format(r))
         print("Precision: {:.2f}".format(p))
         print()
+
 
 # Mencetak rules untuk setiap ruangan
 rules_data_kamar = decision_tree_kamar.print_rules()
