@@ -574,6 +574,35 @@ def get_rules_ruangtamu():
     return jsonify(rules=rules)
 
 
+@app.route('/api/train', methods=['POST'])
+def train_models():
+    try:
+
+        # Membangun pohon keputusan C5.0 untuk setiap ruangan
+        decision_tree_kamar = DecisionTree()
+        decision_tree_kamar.fit(train_data[['Waktu']], train_data['kamar'])
+
+        decision_tree_kamar2 = DecisionTree()
+        decision_tree_kamar2.fit(train_data[['Waktu']], train_data['kamar2'])
+
+        decision_tree_teras = DecisionTree()
+        decision_tree_teras.fit(train_data[['Waktu']], train_data['teras'])
+
+        decision_tree_dapur = DecisionTree()
+        decision_tree_dapur.fit(train_data[['Waktu']], train_data['dapur'])
+
+        decision_tree_toilet = DecisionTree()
+        decision_tree_toilet.fit(train_data[['Waktu']], train_data['toilet'])
+
+        decision_tree_ruangtamu = DecisionTree()
+        decision_tree_ruangtamu.fit(
+            train_data[['Waktu']], train_data['ruangtamu'])
+
+        return jsonify({"success": True, "message": "Models trained successfully"})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)})
+
+
 @app.route('/')
 def index():
     return jsonify({"selamat datang di api untuk menggunakan algoritma C5.0"})
