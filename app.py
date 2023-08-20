@@ -12,9 +12,8 @@ data_url = 'https://drive.google.com/uc?id=' + data_url.split('/')[-2]
 data = pd.read_csv(data_url, encoding='unicode_escape')
 
 
-# Bagi dataset 80:20
-train_data = data.sample(frac=0.8, random_state=42)
-test_data = data.drop(train_data.index)
+# train data 100%
+train_data = data.copy()
 
 # question node
 
@@ -167,43 +166,6 @@ class DecisionTree:
 
         return tree_data
 
-# akurasi
-
-
-def calculate_accuracy(predictions, labels):
-    correct_count = sum(predictions == labels)
-    total_count = len(predictions)
-    accuracy = correct_count / total_count
-    return accuracy
-
-
-def confusion_matrix(y_true, y_pred, labels):
-    num_labels = len(labels)
-    cm = np.zeros((num_labels, num_labels), dtype=int)
-
-    for i in range(num_labels):
-        true_label = labels[i]
-        for j in range(num_labels):
-            pred_label = labels[j]
-            cm[i, j] = np.sum((y_true == true_label) & (y_pred == pred_label))
-
-    return cm
-
-
-def recall(cm, label_idx):
-    true_positives = cm[label_idx, label_idx]
-    total_positives = np.sum(cm[label_idx, :])
-    recall_value = true_positives / total_positives if total_positives != 0 else 0
-    return recall_value
-
-
-def precision(cm, label_idx):
-    true_positives = cm[label_idx, label_idx]
-    total_predicted_positives = np.sum(cm[:, label_idx])
-    precision_value = true_positives / \
-        total_predicted_positives if total_predicted_positives != 0 else 0
-    return precision_value
-
 
 timeloc = pytz.timezone('Asia/Jakarta')
 
@@ -235,108 +197,6 @@ decision_tree_toilet.fit(train_data[['Waktu']], train_data['toilet'])
 decision_tree_ruangtamu = DecisionTree()
 decision_tree_ruangtamu.fit(train_data[['Waktu']], train_data['ruangtamu'])
 
-# Mengabaikan data yang tidak diketahui pada setiap kolom target
-test_data_kamar = test_data[test_data['kamar'] != 'unknown']
-test_data_kamar2 = test_data[test_data['kamar2'] != 'unknown']
-test_data_teras = test_data[test_data['teras'] != 'unknown']
-test_data_dapur = test_data[test_data['dapur'] != 'unknown']
-test_data_toilet = test_data[test_data['toilet'] != 'unknown']
-test_data_ruangtamu = test_data[test_data['ruangtamu'] != 'unknown']
-
-# Melakukan prediksi pada data uji yang telah difilter
-predictions_kamar = decision_tree_kamar.predict(test_data_kamar[['Waktu']])
-predictions_kamar2 = decision_tree_kamar2.predict(test_data_kamar2[['Waktu']])
-predictions_teras = decision_tree_teras.predict(test_data_teras[['Waktu']])
-predictions_dapur = decision_tree_dapur.predict(test_data_dapur[['Waktu']])
-predictions_toilet = decision_tree_toilet.predict(test_data_toilet[['Waktu']])
-predictions_ruangtamu = decision_tree_ruangtamu.predict(
-    test_data_ruangtamu[['Waktu']])
-
-# Menghitung akurasi pada data uji
-accuracy_kamar = calculate_accuracy(predictions_kamar, test_data['kamar'])
-accuracy_kamar2 = calculate_accuracy(predictions_kamar2, test_data['kamar2'])
-accuracy_teras = calculate_accuracy(predictions_teras, test_data['teras'])
-accuracy_dapur = calculate_accuracy(predictions_dapur, test_data['dapur'])
-accuracy_toilet = calculate_accuracy(predictions_toilet, test_data['toilet'])
-accuracy_ruangtamu = calculate_accuracy(
-    predictions_ruangtamu, test_data['ruangtamu'])
-
-# akurasi dataframe
-accuracies = {
-    'Ruangan': ['Kamar', 'Kamar2', 'Teras', 'Dapur', 'Toilet', 'RuangTamu'],
-    'Accuracy': [
-        accuracy_kamar, accuracy_kamar2, accuracy_teras,
-        accuracy_dapur, accuracy_toilet, accuracy_ruangtamu
-    ]
-}
-
-accuracy_df = pd.DataFrame(accuracies)
-print(accuracy_df)
-print()
-
-# recall, precision dan cm
-for column in ['kamar', 'kamar2', 'teras', 'dapur', 'toilet', 'ruangtamu']:
-    decision_tree = DecisionTree()
-    decision_tree.fit(train_data[['Waktu']], train_data[column])
-    y_test = test_data[column]
-    y_pred = test_data.apply(
-        lambda x: decision_tree.predict_instance(x, decision_tree.tree), axis=1)
-    labels = np.unique(y_test)
-    cm = confusion_matrix(y_test, y_pred, labels)
-
-    print("Confusion Matrix ({}) :".format(column))
-    print(cm)
-    print()
-
-    recall_values = []
-    precision_values = []
-    for i, label in enumerate(labels):
-        r = recall(cm, i)
-        p = precision(cm, i)
-        recall_values.append(r)
-        precision_values.append(p)
-
-        print("Label: {} ({})".format(label, column))
-        print("Recall: {:.2f}".format(r))
-        print("Precision: {:.2f}".format(p))
-        print()
-
-
-# Mencetak rules untuk setiap ruangan
-rules_data_kamar = decision_tree_kamar.print_rules()
-print("Rules Kamar:")
-print(rules_data_kamar)
-print()
-
-rules_data_kamar2 = decision_tree_kamar2.print_rules()
-
-print("Rules Kamar2:")
-print(rules_data_kamar2)
-print()
-
-rules_data_teras = decision_tree_teras.print_rules()
-
-print("Rules Teras:")
-print(rules_data_teras)
-print()
-
-rules_data_dapur = decision_tree_dapur.print_rules()
-print("Rules Dapur:")
-print(rules_data_dapur)
-print()
-
-rules_data_toilet = decision_tree_toilet.print_rules()
-
-print("Rules Toilet:")
-print(rules_data_toilet)
-print()
-
-rules_data_ruangtamu = decision_tree_ruangtamu.print_rules()
-print("Rules RuangTamu:")
-print(rules_data_ruangtamu)
-print()
-
-
 app = Flask(__name__)
 CORS(app)
 app.config['CORS_HEADER'] = 'Content-Type'
@@ -360,93 +220,7 @@ decision_tree_ruangtamu = DecisionTree()
 decision_tree_ruangtamu.fit(train_data[['Waktu']], train_data['ruangtamu'])
 
 
-@app.route('/api/accuracy')
-def get_accuracy_all_rooms():
-    accuracies = {
-        'kamar': calculate_accuracy(decision_tree_kamar.predict(test_data_kamar[['Waktu']]), test_data_kamar['kamar']),
-        'kamar2': calculate_accuracy(decision_tree_kamar2.predict(test_data_kamar2[['Waktu']]), test_data_kamar2['kamar2']),
-        'teras': calculate_accuracy(decision_tree_teras.predict(test_data_teras[['Waktu']]), test_data_teras['teras']),
-        'dapur': calculate_accuracy(decision_tree_dapur.predict(test_data_dapur[['Waktu']]), test_data_dapur['dapur']),
-        'toilet': calculate_accuracy(decision_tree_toilet.predict(test_data_toilet[['Waktu']]), test_data_toilet['toilet']),
-        'ruangtamu': calculate_accuracy(decision_tree_ruangtamu.predict(test_data_ruangtamu[['Waktu']]), test_data_ruangtamu['ruangtamu']),
-    }
-    return jsonify(accuracies)
-
-# helper
-
-
-def convert_to_python_int(data):
-    if isinstance(data, np.int64) or isinstance(data, np.int32):
-        return int(data)
-    elif isinstance(data, dict):
-        return {key: convert_to_python_int(value) for key, value in data.items()}
-    elif isinstance(data, list):
-        return [convert_to_python_int(item) for item in data]
-    else:
-        return data
-
-
-@app.route('/api/rules')
-def get_rules_all_rooms():
-    rules = {
-        'kamar': convert_to_python_int(decision_tree_kamar.print_rules()),
-        'kamar2': convert_to_python_int(decision_tree_kamar2.print_rules()),
-        'teras': convert_to_python_int(decision_tree_teras.print_rules()),
-        'dapur': convert_to_python_int(decision_tree_dapur.print_rules()),
-        'toilet': convert_to_python_int(decision_tree_toilet.print_rules()),
-        'ruangtamu': convert_to_python_int(decision_tree_ruangtamu.print_rules()),
-    }
-    return jsonify(rules)
-
-
-# Endpoint to display accuracy, precision, recall, and decision tree rules for each room
-@app.route('/api/result')
-def show_result():
-    result = {}
-    for column in ['kamar', 'kamar2', 'teras', 'dapur', 'toilet', 'ruangtamu']:
-        decision_tree = DecisionTree()
-        decision_tree.fit(train_data[['Waktu']], train_data[column])
-        y_test = test_data[column]
-        y_pred = test_data.apply(
-            lambda x: decision_tree.predict_instance(x, decision_tree.tree), axis=1)
-        labels = np.unique(y_test)
-        cm = confusion_matrix(y_test, y_pred, labels)
-
-        print("Confusion Matrix ({}) :".format(column))
-        print(cm)
-        print()
-
-        recall_values = []
-        precision_values = []
-        for i, label in enumerate(labels):
-            r = recall(cm, i)
-            p = precision(cm, i)
-            recall_values.append(r)
-            precision_values.append(p)
-
-            print("Label: {} ({})".format(label, column))
-            print("Recall: {:.2f}".format(r))
-            print("Precision: {:.2f}".format(p))
-            print()
-
-        accuracy = calculate_accuracy(y_pred, y_test)
-        precision_value_avg = np.mean(precision_values)
-        recall_value_avg = np.mean(recall_values)
-
-        result[column] = {
-            'accuracy': "{:.2f}".format(accuracy),
-            'precision on': "{:.2f}".format(precision_values[0]),
-            'precision off': "{:.2f}".format(precision_values[1]),
-            'recall on': "{:.2f}".format(recall_values[0]),
-            'recall off': "{:.2f}".format(recall_values[1]),
-            'precision_avg': "{:.2f}".format(precision_value_avg),
-            'recall_avg': "{:.2f}".format(recall_value_avg)
-        }
-
-    return jsonify(result=result)
-
-
-@app.route('/api/status')
+@app.route('/api/classify')
 def classify_new_data():
     new_data = generate_new_data()
     result = {}
@@ -524,59 +298,6 @@ def classify_ruangtamu():
     if decision_tree:
         predictions = decision_tree.predict(new_data[['Waktu']])
         return str(1 if predictions[0] == 1 else 2)
-
-
-@app.route('/api/rules/kamar')
-def get_rules_kamar():
-    rules = {
-        'kamar': convert_to_python_int(decision_tree_kamar.print_rules())
-    }
-    return jsonify(rules=rules)
-
-
-@app.route('/api/rules/kamar2')
-def get_rules_kamar2():
-    rules = {
-        'kamar2': convert_to_python_int(decision_tree_kamar2.print_rules())
-    }
-    return jsonify(rules=rules)
-
-
-@app.route('/api/rules/teras')
-def get_rules_teras():
-    rules = {
-        'teras': convert_to_python_int(decision_tree_teras.print_rules())
-    }
-    return jsonify(rules=rules)
-
-
-@app.route('/api/rules/dapur')
-def get_rules_dapur():
-    rules = {
-        'dapur': convert_to_python_int(decision_tree_dapur.print_rules())
-    }
-    return jsonify(rules=rules)
-
-
-@app.route('/api/rules/toilet')
-def get_rules_toilet():
-    rules = {
-        'toilet': convert_to_python_int(decision_tree_toilet.print_rules())
-    }
-    return jsonify(rules=rules)
-
-
-@app.route('/api/rules/ruangtamu')
-def get_rules_ruangtamu():
-    rules = {
-        'ruangtamu': convert_to_python_int(decision_tree_ruangtamu.print_rules())
-    }
-    return jsonify(rules=rules)
-
-
-@app.route('/')
-def index():
-    return jsonify({"selamat datang di api untuk menggunakan algoritma C5.0"})
 
 
 if __name__ == '__main__':
