@@ -688,8 +688,10 @@ def train_models():
         train_data = data1.copy()
         test_data = data2.copy()
 
-        train_data_dict = train_data.to_dict(orient="list")  # Convert DataFrame to dict
-        test_data_dict = test_data.to_dict(orient="list")
+        train_data_dict = train_data.to_dict(
+            orient="index"
+        )  # Convert DataFrame to dict
+        test_data_dict = test_data.to_dict(orient="index")
 
         firebaseApp.put("/", "data_latih", train_data_dict)
         firebaseApp.put("/", "data_uji", test_data_dict)
