@@ -17,11 +17,12 @@ import numpy as np
 # data2_url = 'https://drive.google.com/uc?id=' + data2_url.split('/')[-2]
 # data2 = pd.read_csv(data2_url, encoding='unicode_escape')
 
-data = pd.read_csv('dataset.csv')
-data2 = pd.read_csv('data_uji.csv')
+data = pd.read_csv("dataset.csv")
+data2 = pd.read_csv("test data.csv")
 
 firebaseApp = firebase.FirebaseApplication(
-    'https://smartlamp-automation-default-rtdb.firebaseio.com/', None)
+    "https://smartlamp-automation-default-rtdb.firebaseio.com/", None
+)
 
 
 # Bagi dataset 80:20
@@ -42,6 +43,7 @@ class CreateQuestion:
 
     def __repr__(self):
         return "Is %s >= %s?" % (self.column, str(self.value))
+
 
 # Decision tree class
 
@@ -93,25 +95,24 @@ class DecisionTree:
 
     def build_decision_tree(self, X, y):
         if len(np.unique(y)) == 1:
-            return {'label': y.iloc[0]}
+            return {"label": y.iloc[0]}
         if X.empty or len(X.columns) == 0:
             majority_label = np.argmax(np.bincount(y))
-            return {'label': majority_label}
+            return {"label": majority_label}
 
         best_attribute = self.find_best_attribute(X, y)
         if best_attribute is None:
             majority_label = np.argmax(np.bincount(y))
-            return {'label': majority_label}
+            return {"label": majority_label}
 
-        tree = {'attribute': best_attribute, 'children': {}}
+        tree = {"attribute": best_attribute, "children": {}}
         unique_values = np.unique(X[best_attribute])
 
         for value in unique_values:
             subset_indices = X[best_attribute] == value
             subset_X = X.loc[subset_indices].drop(columns=[best_attribute])
             subset_y = y[subset_indices]
-            tree['children'][value] = self.build_decision_tree(
-                subset_X, subset_y)
+            tree["children"][value] = self.build_decision_tree(subset_X, subset_y)
 
         return tree
 
@@ -119,13 +120,13 @@ class DecisionTree:
         self.tree = self.build_decision_tree(X, y)
 
     def predict_instance(self, instance, node):
-        if 'label' in node:
-            return node['label']
-        attribute = node['attribute']
+        if "label" in node:
+            return node["label"]
+        attribute = node["attribute"]
         value = instance[attribute]
 
-        if value in node['children']:
-            child = node['children'][value]
+        if value in node["children"]:
+            child = node["children"][value]
             return self.predict_instance(instance, child)
         else:
             return None
@@ -164,14 +165,14 @@ class DecisionTree:
         if current_rule is None:
             current_rule = {}
 
-        if 'label' in node:
-            current_rule['Label'] = node['label']
+        if "label" in node:
+            current_rule["Label"] = node["label"]
             rules_data.append(current_rule.copy())
             return
 
-        attribute = node['attribute']
+        attribute = node["attribute"]
 
-        for value, child_node in node['children'].items():
+        for value, child_node in node["children"].items():
             new_rule_part = {attribute: value}
             new_rule = {**current_rule, **new_rule_part}
             self.print_rules(child_node, rules_data, new_rule)
@@ -185,22 +186,24 @@ class DecisionTree:
         if tree_data is None:
             tree_data = []
 
-        if 'label' in node:
+        if "label" in node:
             tree_data.append(
-                {'Node': 'Label', 'Value': node['label'], 'Indent': indent})
+                {"Node": "Label", "Value": node["label"], "Indent": indent}
+            )
             return
 
-        attribute = node['attribute']
-        tree_data.append(
-            {'Node': 'Attribute', 'Value': attribute, 'Indent': indent})
+        attribute = node["attribute"]
+        tree_data.append({"Node": "Attribute", "Value": attribute, "Indent": indent})
 
-        for value, child_node in node['children'].items():
+        for value, child_node in node["children"].items():
             question = CreateQuestion(attribute, value)
             tree_data.append(
-                {'Node': 'Question', 'Value': repr(question), 'Indent': indent + 1})
+                {"Node": "Question", "Value": repr(question), "Indent": indent + 1}
+            )
             self.print_tree(child_node, indent + 2, tree_data)
 
         return tree_data
+
 
 # akurasi
 
@@ -235,20 +238,24 @@ def recall(cm, label_idx):
 def precision(cm, label_idx):
     true_positives = cm[label_idx, label_idx]
     total_predicted_positives = np.sum(cm[:, label_idx])
-    precision_value = true_positives / \
-        total_predicted_positives if total_predicted_positives != 0 else 0
+    precision_value = (
+        true_positives / total_predicted_positives
+        if total_predicted_positives != 0
+        else 0
+    )
     return precision_value
 
 
-timeloc = pytz.timezone('Asia/Jakarta')
+timeloc = pytz.timezone("Asia/Jakarta")
 
 
 def generate_new_data():
     current_time = datetime.datetime.now(tz=timeloc).time()
-    new_data = pd.DataFrame({'Waktu': [current_time]})
-    new_data['Waktu'] = new_data['Waktu'].apply(
-        lambda x: x.hour * 60 + x.minute)
+    new_data = pd.DataFrame({"Waktu": [current_time]})
+    new_data["Waktu"] = new_data["Waktu"].apply(lambda x: x.hour * 60 + x.minute)
     return new_data
+
+
 # def generate_new_data():
 #     current_time = datetime.datetime.now(tz=timeloc).strftime("%H:%M:%S")
 #     new_data = pd.DataFrame({'Waktu': [current_time]})
@@ -257,56 +264,58 @@ def generate_new_data():
 
 # Membangun pohon keputusan C5.0 untuk setiap ruangan
 decision_tree_kamar = DecisionTree()
-decision_tree_kamar.fit(train_data[['Waktu']], train_data['kamar'])
+decision_tree_kamar.fit(train_data[["Waktu"]], train_data["kamar"])
 
 decision_tree_kamar2 = DecisionTree()
-decision_tree_kamar2.fit(train_data[['Waktu']], train_data['kamar2'])
+decision_tree_kamar2.fit(train_data[["Waktu"]], train_data["kamar2"])
 
 decision_tree_teras = DecisionTree()
-decision_tree_teras.fit(train_data[['Waktu']], train_data['teras'])
+decision_tree_teras.fit(train_data[["Waktu"]], train_data["teras"])
 
 decision_tree_dapur = DecisionTree()
-decision_tree_dapur.fit(train_data[['Waktu']], train_data['dapur'])
+decision_tree_dapur.fit(train_data[["Waktu"]], train_data["dapur"])
 
 decision_tree_toilet = DecisionTree()
-decision_tree_toilet.fit(train_data[['Waktu']], train_data['toilet'])
+decision_tree_toilet.fit(train_data[["Waktu"]], train_data["toilet"])
 
 decision_tree_ruangtamu = DecisionTree()
-decision_tree_ruangtamu.fit(train_data[['Waktu']], train_data['ruangtamu'])
+decision_tree_ruangtamu.fit(train_data[["Waktu"]], train_data["ruangtamu"])
 
 # Mengabaikan data yang tidak diketahui pada setiap kolom target
-test_data_kamar = test_data[test_data['kamar'] != 'unknown']
-test_data_kamar2 = test_data[test_data['kamar2'] != 'unknown']
-test_data_teras = test_data[test_data['teras'] != 'unknown']
-test_data_dapur = test_data[test_data['dapur'] != 'unknown']
-test_data_toilet = test_data[test_data['toilet'] != 'unknown']
-test_data_ruangtamu = test_data[test_data['ruangtamu'] != 'unknown']
+test_data_kamar = test_data[test_data["kamar"] != "unknown"]
+test_data_kamar2 = test_data[test_data["kamar2"] != "unknown"]
+test_data_teras = test_data[test_data["teras"] != "unknown"]
+test_data_dapur = test_data[test_data["dapur"] != "unknown"]
+test_data_toilet = test_data[test_data["toilet"] != "unknown"]
+test_data_ruangtamu = test_data[test_data["ruangtamu"] != "unknown"]
 
 # Melakukan prediksi pada data uji yang telah difilter
-predictions_kamar = decision_tree_kamar.predict(test_data_kamar[['Waktu']])
-predictions_kamar2 = decision_tree_kamar2.predict(test_data_kamar2[['Waktu']])
-predictions_teras = decision_tree_teras.predict(test_data_teras[['Waktu']])
-predictions_dapur = decision_tree_dapur.predict(test_data_dapur[['Waktu']])
-predictions_toilet = decision_tree_toilet.predict(test_data_toilet[['Waktu']])
-predictions_ruangtamu = decision_tree_ruangtamu.predict(
-    test_data_ruangtamu[['Waktu']])
+predictions_kamar = decision_tree_kamar.predict(test_data_kamar[["Waktu"]])
+predictions_kamar2 = decision_tree_kamar2.predict(test_data_kamar2[["Waktu"]])
+predictions_teras = decision_tree_teras.predict(test_data_teras[["Waktu"]])
+predictions_dapur = decision_tree_dapur.predict(test_data_dapur[["Waktu"]])
+predictions_toilet = decision_tree_toilet.predict(test_data_toilet[["Waktu"]])
+predictions_ruangtamu = decision_tree_ruangtamu.predict(test_data_ruangtamu[["Waktu"]])
 
 # Menghitung akurasi pada data uji
-accuracy_kamar = calculate_accuracy(predictions_kamar, test_data['kamar'])
-accuracy_kamar2 = calculate_accuracy(predictions_kamar2, test_data['kamar2'])
-accuracy_teras = calculate_accuracy(predictions_teras, test_data['teras'])
-accuracy_dapur = calculate_accuracy(predictions_dapur, test_data['dapur'])
-accuracy_toilet = calculate_accuracy(predictions_toilet, test_data['toilet'])
-accuracy_ruangtamu = calculate_accuracy(
-    predictions_ruangtamu, test_data['ruangtamu'])
+accuracy_kamar = calculate_accuracy(predictions_kamar, test_data["kamar"])
+accuracy_kamar2 = calculate_accuracy(predictions_kamar2, test_data["kamar2"])
+accuracy_teras = calculate_accuracy(predictions_teras, test_data["teras"])
+accuracy_dapur = calculate_accuracy(predictions_dapur, test_data["dapur"])
+accuracy_toilet = calculate_accuracy(predictions_toilet, test_data["toilet"])
+accuracy_ruangtamu = calculate_accuracy(predictions_ruangtamu, test_data["ruangtamu"])
 
 # akurasi dataframe
 accuracies = {
-    'Ruangan': ['Kamar', 'Kamar2', 'Teras', 'Dapur', 'Toilet', 'RuangTamu'],
-    'Accuracy': [
-        accuracy_kamar, accuracy_kamar2, accuracy_teras,
-        accuracy_dapur, accuracy_toilet, accuracy_ruangtamu
-    ]
+    "Ruangan": ["Kamar", "Kamar2", "Teras", "Dapur", "Toilet", "RuangTamu"],
+    "Accuracy": [
+        accuracy_kamar,
+        accuracy_kamar2,
+        accuracy_teras,
+        accuracy_dapur,
+        accuracy_toilet,
+        accuracy_ruangtamu,
+    ],
 }
 
 accuracy_df = pd.DataFrame(accuracies)
@@ -314,12 +323,13 @@ print(accuracy_df)
 print()
 
 # recall, precision dan cm
-for column in ['kamar', 'kamar2', 'teras', 'dapur', 'toilet', 'ruangtamu']:
+for column in ["kamar", "kamar2", "teras", "dapur", "toilet", "ruangtamu"]:
     decision_tree = DecisionTree()
-    decision_tree.fit(train_data[['Waktu']], train_data[column])
+    decision_tree.fit(train_data[["Waktu"]], train_data[column])
     y_test = test_data[column]
     y_pred = test_data.apply(
-        lambda x: decision_tree.predict_instance(x, decision_tree.tree), axis=1)
+        lambda x: decision_tree.predict_instance(x, decision_tree.tree), axis=1
+    )
     labels = np.unique(y_test)
     cm = confusion_matrix(y_test, y_pred, labels)
 
@@ -342,18 +352,9 @@ for column in ['kamar', 'kamar2', 'teras', 'dapur', 'toilet', 'ruangtamu']:
 
     # Membuat struktur data untuk confusion matrix dan informasi lainnya
     data = {
-        "confusion_matrix": {
-            "matrix": cm.tolist(),
-            "labels": labels.tolist()
-        },
-        "label_1": {
-            "recall": recall_values[0],
-            "precision": precision_values[0]
-        },
-        "label_2": {
-            "recall": recall_values[1],
-            "precision": precision_values[1]
-        }
+        "confusion_matrix": {"matrix": cm.tolist(), "labels": labels.tolist()},
+        "label_1": {"recall": recall_values[0], "precision": precision_values[0]},
+        "label_2": {"recall": recall_values[1], "precision": precision_values[1]},
     }
 
     # Menyimpan data ke Firebase
@@ -361,8 +362,7 @@ for column in ['kamar', 'kamar2', 'teras', 'dapur', 'toilet', 'ruangtamu']:
     path = f"/confusion_matrix/{column}"
     response = firebaseApp.put(path, "/", data)
 
-    print(
-        f"Informasi ({column}) berhasil disimpan di Firebase dengan path: {path}")
+    print(f"Informasi ({column}) berhasil disimpan di Firebase dengan path: {path}")
     print(response)
     print()
 
@@ -380,16 +380,16 @@ def convert_to_python_int(data):
 
 # Mencetak rules untuk setiap ruangan dan menggabungkannya menjadi satu data
 rules_data = {
-    'kamar': convert_to_python_int(decision_tree_kamar.print_rules()),
-    'kamar2': convert_to_python_int(decision_tree_kamar2.print_rules()),
-    'teras': convert_to_python_int(decision_tree_teras.print_rules()),
-    'dapur': convert_to_python_int(decision_tree_dapur.print_rules()),
-    'toilet': convert_to_python_int(decision_tree_toilet.print_rules()),
-    'ruangtamu': convert_to_python_int(decision_tree_ruangtamu.print_rules()),
+    "kamar": convert_to_python_int(decision_tree_kamar.print_rules()),
+    "kamar2": convert_to_python_int(decision_tree_kamar2.print_rules()),
+    "teras": convert_to_python_int(decision_tree_teras.print_rules()),
+    "dapur": convert_to_python_int(decision_tree_dapur.print_rules()),
+    "toilet": convert_to_python_int(decision_tree_toilet.print_rules()),
+    "ruangtamu": convert_to_python_int(decision_tree_ruangtamu.print_rules()),
 }
 
 # Kirim data aturan ke Firebase Realtime Database
-firebaseApp.put('/rules', '/', rules_data)
+firebaseApp.put("/rules", "/", rules_data)
 
 print(type(train_data))
 print(type(test_data))
@@ -428,38 +428,57 @@ print(type(test_data))
 
 app = Flask(__name__)
 CORS(app)
-app.config['CORS_HEADER'] = 'Content-Type'
+app.config["CORS_HEADER"] = "Content-Type"
 
 decision_tree_kamar = DecisionTree()
-decision_tree_kamar.fit(train_data[['Waktu']], train_data['kamar'])
+decision_tree_kamar.fit(train_data[["Waktu"]], train_data["kamar"])
 
 decision_tree_kamar2 = DecisionTree()
-decision_tree_kamar2.fit(train_data[['Waktu']], train_data['kamar2'])
+decision_tree_kamar2.fit(train_data[["Waktu"]], train_data["kamar2"])
 
 decision_tree_teras = DecisionTree()
-decision_tree_teras.fit(train_data[['Waktu']], train_data['teras'])
+decision_tree_teras.fit(train_data[["Waktu"]], train_data["teras"])
 
 decision_tree_dapur = DecisionTree()
-decision_tree_dapur.fit(train_data[['Waktu']], train_data['dapur'])
+decision_tree_dapur.fit(train_data[["Waktu"]], train_data["dapur"])
 
 decision_tree_toilet = DecisionTree()
-decision_tree_toilet.fit(train_data[['Waktu']], train_data['toilet'])
+decision_tree_toilet.fit(train_data[["Waktu"]], train_data["toilet"])
 
 decision_tree_ruangtamu = DecisionTree()
-decision_tree_ruangtamu.fit(train_data[['Waktu']], train_data['ruangtamu'])
+decision_tree_ruangtamu.fit(train_data[["Waktu"]], train_data["ruangtamu"])
 
 
-@app.route('/api/accuracy')
+@app.route("/api/accuracy")
 def get_accuracy_all_rooms():
     accuracies = {
-        'kamar': calculate_accuracy(decision_tree_kamar.predict(test_data_kamar[['Waktu']]), test_data_kamar['kamar']),
-        'kamar2': calculate_accuracy(decision_tree_kamar2.predict(test_data_kamar2[['Waktu']]), test_data_kamar2['kamar2']),
-        'teras': calculate_accuracy(decision_tree_teras.predict(test_data_teras[['Waktu']]), test_data_teras['teras']),
-        'dapur': calculate_accuracy(decision_tree_dapur.predict(test_data_dapur[['Waktu']]), test_data_dapur['dapur']),
-        'toilet': calculate_accuracy(decision_tree_toilet.predict(test_data_toilet[['Waktu']]), test_data_toilet['toilet']),
-        'ruangtamu': calculate_accuracy(decision_tree_ruangtamu.predict(test_data_ruangtamu[['Waktu']]), test_data_ruangtamu['ruangtamu']),
+        "kamar": calculate_accuracy(
+            decision_tree_kamar.predict(test_data_kamar[["Waktu"]]),
+            test_data_kamar["kamar"],
+        ),
+        "kamar2": calculate_accuracy(
+            decision_tree_kamar2.predict(test_data_kamar2[["Waktu"]]),
+            test_data_kamar2["kamar2"],
+        ),
+        "teras": calculate_accuracy(
+            decision_tree_teras.predict(test_data_teras[["Waktu"]]),
+            test_data_teras["teras"],
+        ),
+        "dapur": calculate_accuracy(
+            decision_tree_dapur.predict(test_data_dapur[["Waktu"]]),
+            test_data_dapur["dapur"],
+        ),
+        "toilet": calculate_accuracy(
+            decision_tree_toilet.predict(test_data_toilet[["Waktu"]]),
+            test_data_toilet["toilet"],
+        ),
+        "ruangtamu": calculate_accuracy(
+            decision_tree_ruangtamu.predict(test_data_ruangtamu[["Waktu"]]),
+            test_data_ruangtamu["ruangtamu"],
+        ),
     }
     return jsonify(accuracies)
+
 
 # helper
 
@@ -475,29 +494,30 @@ def get_accuracy_all_rooms():
 #         return data
 
 
-@app.route('/api/rules')
+@app.route("/api/rules")
 def get_rules_all_rooms():
     rules = {
-        'kamar': convert_to_python_int(decision_tree_kamar.print_rules()),
-        'kamar2': convert_to_python_int(decision_tree_kamar2.print_rules()),
-        'teras': convert_to_python_int(decision_tree_teras.print_rules()),
-        'dapur': convert_to_python_int(decision_tree_dapur.print_rules()),
-        'toilet': convert_to_python_int(decision_tree_toilet.print_rules()),
-        'ruangtamu': convert_to_python_int(decision_tree_ruangtamu.print_rules()),
+        "kamar": convert_to_python_int(decision_tree_kamar.print_rules()),
+        "kamar2": convert_to_python_int(decision_tree_kamar2.print_rules()),
+        "teras": convert_to_python_int(decision_tree_teras.print_rules()),
+        "dapur": convert_to_python_int(decision_tree_dapur.print_rules()),
+        "toilet": convert_to_python_int(decision_tree_toilet.print_rules()),
+        "ruangtamu": convert_to_python_int(decision_tree_ruangtamu.print_rules()),
     }
     return jsonify(rules)
 
 
 # Endpoint to display accuracy, precision, recall, and decision tree rules for each room
-@app.route('/api/result')
+@app.route("/api/result")
 def show_result():
     result = {}
-    for column in ['kamar', 'kamar2', 'teras', 'dapur', 'toilet', 'ruangtamu']:
+    for column in ["kamar", "kamar2", "teras", "dapur", "toilet", "ruangtamu"]:
         decision_tree = DecisionTree()
-        decision_tree.fit(train_data[['Waktu']], train_data[column])
+        decision_tree.fit(train_data[["Waktu"]], train_data[column])
         y_test = test_data[column]
         y_pred = test_data.apply(
-            lambda x: decision_tree.predict_instance(x, decision_tree.tree), axis=1)
+            lambda x: decision_tree.predict_instance(x, decision_tree.tree), axis=1
+        )
         labels = np.unique(y_test)
         cm = confusion_matrix(y_test, y_pred, labels)
 
@@ -523,31 +543,31 @@ def show_result():
         recall_value_avg = np.mean(recall_values)
 
         result[column] = {
-            'accuracy': "{:.2f}".format(accuracy),
-            'precision on': "{:.2f}".format(precision_values[0]),
-            'precision off': "{:.2f}".format(precision_values[1]),
-            'recall on': "{:.2f}".format(recall_values[0]),
-            'recall off': "{:.2f}".format(recall_values[1]),
-            'precision_avg': "{:.2f}".format(precision_value_avg),
-            'recall_avg': "{:.2f}".format(recall_value_avg)
+            "accuracy": "{:.2f}".format(accuracy),
+            "precision on": "{:.2f}".format(precision_values[0]),
+            "precision off": "{:.2f}".format(precision_values[1]),
+            "recall on": "{:.2f}".format(recall_values[0]),
+            "recall off": "{:.2f}".format(recall_values[1]),
+            "precision_avg": "{:.2f}".format(precision_value_avg),
+            "recall_avg": "{:.2f}".format(recall_value_avg),
         }
 
     return jsonify(result=result)
 
 
-@app.route('/api/status')
+@app.route("/api/status")
 def classify_new_data():
     new_data = generate_new_data()
     result = {}
 
     # Buat dictionary decision_tree
     decision_trees = {
-        'kamar': decision_tree_kamar,
-        'kamar2': decision_tree_kamar2,
-        'teras': decision_tree_teras,
-        'dapur': decision_tree_dapur,
-        'toilet': decision_tree_toilet,
-        'ruangtamu': decision_tree_ruangtamu
+        "kamar": decision_tree_kamar,
+        "kamar2": decision_tree_kamar2,
+        "teras": decision_tree_teras,
+        "dapur": decision_tree_dapur,
+        "toilet": decision_tree_toilet,
+        "ruangtamu": decision_tree_ruangtamu,
     }
 
     # Ambil waktu satu kali
@@ -556,153 +576,141 @@ def classify_new_data():
     # Inisialisasi respons dengan Tanggal dan Waktu
     response = {
         "Tanggal": current_time.strftime("%d-%m-%Y"),
-        "Waktu": current_time.strftime("%H:%M:%S")
+        "Waktu": current_time.strftime("%H:%M:%S"),
     }
 
     # Loop melalui semua kolom dan prediksi
     for column, decision_tree in decision_trees.items():
         if decision_tree:
-            predictions = decision_tree.predict(new_data[['Waktu']])
+            predictions = decision_tree.predict(new_data[["Waktu"]])
             response[column] = "hidup" if predictions[0] == 2 else "mati"
 
     return jsonify(response)
 
 
-@app.route('/api/status/kamar')
+@app.route("/api/status/kamar")
 def classify_kamar():
     new_data = generate_new_data()
     decision_tree = decision_tree_kamar
     if decision_tree:
-        predictions = decision_tree.predict(new_data[['Waktu']])
+        predictions = decision_tree.predict(new_data[["Waktu"]])
         return str(1 if predictions[0] == 1 else 2)
 
 
-@app.route('/api/status/kamar2')
+@app.route("/api/status/kamar2")
 def classify_kamar2():
     new_data = generate_new_data()
     decision_tree = decision_tree_kamar2
     if decision_tree:
-        predictions = decision_tree.predict(new_data[['Waktu']])
+        predictions = decision_tree.predict(new_data[["Waktu"]])
         return str(1 if predictions[0] == 1 else 2)
 
 
-@app.route('/api/status/teras')
+@app.route("/api/status/teras")
 def classify_teras():
     new_data = generate_new_data()
     decision_tree = decision_tree_teras
     if decision_tree:
-        predictions = decision_tree.predict(new_data[['Waktu']])
+        predictions = decision_tree.predict(new_data[["Waktu"]])
         return str(1 if predictions[0] == 1 else 2)
 
 
-@app.route('/api/status/dapur')
+@app.route("/api/status/dapur")
 def classify_dapur():
     new_data = generate_new_data()
     decision_tree = decision_tree_dapur
     if decision_tree:
-        predictions = decision_tree.predict(new_data[['Waktu']])
+        predictions = decision_tree.predict(new_data[["Waktu"]])
         return str(1 if predictions[0] == 1 else 2)
 
 
-@app.route('/api/status/toilet')
+@app.route("/api/status/toilet")
 def classify_toilet():
     new_data = generate_new_data()
     decision_tree = decision_tree_toilet
     if decision_tree:
-        predictions = decision_tree.predict(new_data[['Waktu']])
+        predictions = decision_tree.predict(new_data[["Waktu"]])
         return str(1 if predictions[0] == 1 else 2)
 
 
-@app.route('/api/status/ruangtamu')
+@app.route("/api/status/ruangtamu")
 def classify_ruangtamu():
     new_data = generate_new_data()
     decision_tree = decision_tree_ruangtamu
     if decision_tree:
-        predictions = decision_tree.predict(new_data[['Waktu']])
+        predictions = decision_tree.predict(new_data[["Waktu"]])
         return str(1 if predictions[0] == 1 else 2)
 
 
-@app.route('/api/rules/kamar')
+@app.route("/api/rules/kamar")
 def get_rules_kamar():
-    rules = {
-        'kamar': convert_to_python_int(decision_tree_kamar.print_rules())
-    }
+    rules = {"kamar": convert_to_python_int(decision_tree_kamar.print_rules())}
     return jsonify(rules=rules)
 
 
-@app.route('/api/rules/kamar2')
+@app.route("/api/rules/kamar2")
 def get_rules_kamar2():
-    rules = {
-        'kamar2': convert_to_python_int(decision_tree_kamar2.print_rules())
-    }
+    rules = {"kamar2": convert_to_python_int(decision_tree_kamar2.print_rules())}
     return jsonify(rules=rules)
 
 
-@app.route('/api/rules/teras')
+@app.route("/api/rules/teras")
 def get_rules_teras():
-    rules = {
-        'teras': convert_to_python_int(decision_tree_teras.print_rules())
-    }
+    rules = {"teras": convert_to_python_int(decision_tree_teras.print_rules())}
     return jsonify(rules=rules)
 
 
-@app.route('/api/rules/dapur')
+@app.route("/api/rules/dapur")
 def get_rules_dapur():
-    rules = {
-        'dapur': convert_to_python_int(decision_tree_dapur.print_rules())
-    }
+    rules = {"dapur": convert_to_python_int(decision_tree_dapur.print_rules())}
     return jsonify(rules=rules)
 
 
-@app.route('/api/rules/toilet')
+@app.route("/api/rules/toilet")
 def get_rules_toilet():
-    rules = {
-        'toilet': convert_to_python_int(decision_tree_toilet.print_rules())
-    }
+    rules = {"toilet": convert_to_python_int(decision_tree_toilet.print_rules())}
     return jsonify(rules=rules)
 
 
-@app.route('/api/rules/ruangtamu')
+@app.route("/api/rules/ruangtamu")
 def get_rules_ruangtamu():
-    rules = {
-        'ruangtamu': convert_to_python_int(decision_tree_ruangtamu.print_rules())
-    }
+    rules = {"ruangtamu": convert_to_python_int(decision_tree_ruangtamu.print_rules())}
     return jsonify(rules=rules)
 
 
-@app.route('/api/train', methods=['POST'])
+@app.route("/api/train", methods=["POST"])
 def train_models():
     try:
         firebaseApp = firebase.FirebaseApplication(
-            'https://smartlamp-automation-default-rtdb.firebaseio.com/', None)
+            "https://smartlamp-automation-default-rtdb.firebaseio.com/", None
+        )
 
         train_data = data.copy()
         test_data = data2.copy()
 
-        train_data_dict = train_data.to_dict(orient='index')
-        test_data_dict = test_data.to_dict(orient='index')
+        train_data_dict = train_data.to_dict(orient="index")
+        test_data_dict = test_data.to_dict(orient="index")
 
-        firebaseApp.put('/', 'data_latih', train_data_dict)
-        firebaseApp.put('/', 'data_uji', test_data_dict)
+        firebaseApp.put("/", "data_latih", train_data_dict)
+        firebaseApp.put("/", "data_uji", test_data_dict)
 
         decision_tree_kamar = DecisionTree()
-        decision_tree_kamar.fit(train_data[['Waktu']], train_data['kamar'])
+        decision_tree_kamar.fit(train_data[["Waktu"]], train_data["kamar"])
 
         decision_tree_kamar2 = DecisionTree()
-        decision_tree_kamar2.fit(train_data[['Waktu']], train_data['kamar2'])
+        decision_tree_kamar2.fit(train_data[["Waktu"]], train_data["kamar2"])
 
         decision_tree_teras = DecisionTree()
-        decision_tree_teras.fit(train_data[['Waktu']], train_data['teras'])
+        decision_tree_teras.fit(train_data[["Waktu"]], train_data["teras"])
 
         decision_tree_dapur = DecisionTree()
-        decision_tree_dapur.fit(train_data[['Waktu']], train_data['dapur'])
+        decision_tree_dapur.fit(train_data[["Waktu"]], train_data["dapur"])
 
         decision_tree_toilet = DecisionTree()
-        decision_tree_toilet.fit(train_data[['Waktu']], train_data['toilet'])
+        decision_tree_toilet.fit(train_data[["Waktu"]], train_data["toilet"])
 
         decision_tree_ruangtamu = DecisionTree()
-        decision_tree_ruangtamu.fit(
-            train_data[['Waktu']], train_data['ruangtamu'])
+        decision_tree_ruangtamu.fit(train_data[["Waktu"]], train_data["ruangtamu"])
 
         return jsonify({"success": True, "message": "Models trained successfully"})
     except Exception as e:
@@ -741,23 +749,24 @@ def calculate_gain_ratio(room_data, target_data):
     return gain_ratio
 
 
-@app.route('/api/gain-ratio/<room_name>')
+@app.route("/api/gain-ratio/<room_name>")
 def get_gain_ratio(room_name):
     try:
         # Assuming you have a dictionary mapping room names to their data columns
         room_columns = {
-            'kamar': train_data['kamar'],
-            'kamar2': train_data['kamar2'],
-            'teras': train_data['teras'],
-            'dapur': train_data['dapur'],
-            'toilet': train_data['toilet'],
-            'ruangtamu': train_data['ruangtamu']
+            "kamar": train_data["kamar"],
+            "kamar2": train_data["kamar2"],
+            "teras": train_data["teras"],
+            "dapur": train_data["dapur"],
+            "toilet": train_data["toilet"],
+            "ruangtamu": train_data["ruangtamu"],
         }
 
         if room_name in room_columns:
             # Use the correct target column name from your dataset
             gain_ratio = calculate_gain_ratio(
-                room_columns[room_name], train_data[room_name])
+                room_columns[room_name], train_data[room_name]
+            )
             return jsonify({"gain_ratio": gain_ratio})
         else:
             return jsonify({"error": "Room not found"})
@@ -766,7 +775,7 @@ def get_gain_ratio(room_name):
         return jsonify({"error": str(e)})
 
 
-@app.route('/api/gain-ratio/all')
+@app.route("/api/gain-ratio/all")
 def get_gain_ratio_for_all_rooms():
     gain_ratios = {}
     for room_name, room_data in room_columns.items():
@@ -777,23 +786,24 @@ def get_gain_ratio_for_all_rooms():
     return jsonify(gain_ratios)
 
 
-@app.route('/api/information-gain/<room_name>')
+@app.route("/api/information-gain/<room_name>")
 def get_information_gain(room_name):
     try:
         # Assuming you have a dictionary mapping room names to their data columns
         room_columns = {
-            'kamar': train_data['kamar'],
-            'kamar2': train_data['kamar2'],
-            'teras': train_data['teras'],
-            'dapur': train_data['dapur'],
-            'toilet': train_data['toilet'],
-            'ruangtamu': train_data['ruangtamu']
+            "kamar": train_data["kamar"],
+            "kamar2": train_data["kamar2"],
+            "teras": train_data["teras"],
+            "dapur": train_data["dapur"],
+            "toilet": train_data["toilet"],
+            "ruangtamu": train_data["ruangtamu"],
         }
 
         if room_name in room_columns:
             # Use the correct target column name from your dataset
             information_gain = calculate_information_gain(
-                room_columns[room_name], train_data[room_name])
+                room_columns[room_name], train_data[room_name]
+            )
             return jsonify({"information_gain": information_gain})
         else:
             return jsonify({"error": "Room not found"})
@@ -802,28 +812,27 @@ def get_information_gain(room_name):
         return jsonify({"error": str(e)})
 
 
-@app.route('/api/information-gain/all')
+@app.route("/api/information-gain/all")
 def get_information_gain_for_all_rooms():
     information_gains = {}
     for room_name, room_data in room_columns.items():
-        information_gain = calculate_information_gain(
-            room_data, train_data[room_name])
+        information_gain = calculate_information_gain(room_data, train_data[room_name])
         information_gains[room_name] = information_gain
 
     return jsonify(information_gains)
 
 
-@app.route('/api/entropy/<room_name>')
+@app.route("/api/entropy/<room_name>")
 def get_entropy(room_name):
     try:
         # Assuming you have a dictionary mapping room names to their data columns
         room_columns = {
-            'kamar': train_data['kamar'],
-            'kamar2': train_data['kamar2'],
-            'teras': train_data['teras'],
-            'dapur': train_data['dapur'],
-            'toilet': train_data['toilet'],
-            'ruangtamu': train_data['ruangtamu']
+            "kamar": train_data["kamar"],
+            "kamar2": train_data["kamar2"],
+            "teras": train_data["teras"],
+            "dapur": train_data["dapur"],
+            "toilet": train_data["toilet"],
+            "ruangtamu": train_data["ruangtamu"],
         }
 
         if room_name in room_columns:
@@ -836,7 +845,7 @@ def get_entropy(room_name):
         return jsonify({"error": str(e)})
 
 
-@app.route('/api/entropy/all')
+@app.route("/api/entropy/all")
 def get_entropy_for_all_rooms():
     entropies = {}
     for room_name, room_data in room_columns.items():
@@ -847,19 +856,19 @@ def get_entropy_for_all_rooms():
 
 
 room_columns = {
-    'kamar': train_data['kamar'],
-    'kamar2': train_data['kamar2'],
-    'teras': train_data['teras'],
-    'dapur': train_data['dapur'],
-    'toilet': train_data['toilet'],
-    'ruangtamu': train_data['ruangtamu']
+    "kamar": train_data["kamar"],
+    "kamar2": train_data["kamar2"],
+    "teras": train_data["teras"],
+    "dapur": train_data["dapur"],
+    "toilet": train_data["toilet"],
+    "ruangtamu": train_data["ruangtamu"],
 }
 
 
-@app.route('/')
+@app.route("/")
 def index():
-    return jsonify({"selamat datang di api untuk menggunakan algoritma C5.0"})
+    return jsonify("selamat datang di api untuk menggunakan algoritma C5.0")
 
 
-if __name__ == '__main__':
-    app.run(debug=True, host='192.168.101.169', port=5000)
+if __name__ == "__main__":
+    app.run(debug=True, host="192.168.101.169", port=5000)
