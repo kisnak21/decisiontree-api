@@ -17,7 +17,7 @@ import numpy as np
 # data2_url = 'https://drive.google.com/uc?id=' + data2_url.split('/')[-2]
 # data2 = pd.read_csv(data2_url, encoding='unicode_escape')
 
-data = pd.read_csv("dataset.csv")
+data1 = pd.read_csv("dataset.csv")
 data2 = pd.read_csv("test data.csv")
 
 firebaseApp = firebase.FirebaseApplication(
@@ -26,7 +26,7 @@ firebaseApp = firebase.FirebaseApplication(
 
 
 # Bagi dataset 80:20
-train_data = data.copy()
+train_data = data1.copy()
 test_data = data2.copy()
 
 # question node
@@ -685,11 +685,11 @@ def train_models():
             "https://smartlamp-automation-default-rtdb.firebaseio.com/", None
         )
 
-        train_data = data.copy()
+        train_data = data1.copy()
         test_data = data2.copy()
 
-        train_data_dict = train_data.to_dict(orient="index")
-        test_data_dict = test_data.to_dict(orient="index")
+        train_data_dict = train_data.to_dict(orient="list")  # Convert DataFrame to dict
+        test_data_dict = test_data.to_dict(orient="list")
 
         firebaseApp.put("/", "data_latih", train_data_dict)
         firebaseApp.put("/", "data_uji", test_data_dict)
