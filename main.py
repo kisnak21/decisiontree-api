@@ -75,10 +75,10 @@ class DecisionTree:
 
     def gain_ratio(self, X, y, feature):
         information_gain = self.information_gain(X, y, feature)
-        split_info = self.entropy(X[feature])
-        if split_info == 0:
+        entropy_s = self.entropy(y)
+        if entropy_s == 0:
             return 0
-        gain_ratio = information_gain / split_info
+        gain_ratio = information_gain / entropy_s
         return gain_ratio
 
     def find_best_attribute(self, X, y):
@@ -725,7 +725,6 @@ def calculate_entropy(room_data):
     entropy = -np.sum(probabilities * np.log2(probabilities + 1e-9))
     return entropy
 
-
 def calculate_information_gain(room_data, target_data):
     entropy_before = calculate_entropy(target_data)
     unique_values = np.unique(room_data)
@@ -744,10 +743,10 @@ def calculate_information_gain(room_data, target_data):
 
 def calculate_gain_ratio(room_data, target_data):
     information_gain = calculate_information_gain(room_data, target_data)
-    split_info = calculate_entropy(room_data)
-    if split_info == 0:
+    entropy_s = calculate_entropy(room_data)
+    if entropy_s == 0:
         return 0
-    gain_ratio = information_gain / split_info
+    gain_ratio = information_gain / entropy_s
     return gain_ratio
 
 
@@ -873,4 +872,4 @@ def index():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, host="192.168.101.169", port=5000)
+    app.run(debug=True, host="127.0.0.1", port=5000)
