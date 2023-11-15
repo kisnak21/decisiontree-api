@@ -1,3 +1,4 @@
+# library
 from flask import Flask, jsonify
 from flask_cors import CORS
 from firebase import firebase
@@ -6,30 +7,18 @@ import pytz
 import pandas as pd
 import numpy as np
 
-
-# # data latih from drive
-# data_url = 'https://drive.google.com/file/d/1utoPLUMN1JCsl6VaRwYE0WscoAh7dmds/view?usp=share_link'
-# data_url = 'https://drive.google.com/uc?id=' + data_url.split('/')[-2]
-# data = pd.read_csv(data_url, encoding='unicode_escape')
-
-# # data uji drive
-# data2_url = 'https://drive.google.com/file/d/1K-5Rv5iho0qtXNSJg4aNLipcHhFIQ076/view?usp=share_link'
-# data2_url = 'https://drive.google.com/uc?id=' + data2_url.split('/')[-2]
-# data2 = pd.read_csv(data2_url, encoding='unicode_escape')
-
-data1 = pd.read_csv("dataset.csv")
-data2 = pd.read_csv("test data.csv")
-
+# inisialisasi firebase
 firebaseApp = firebase.FirebaseApplication(
     "https://smartlamp-automation-default-rtdb.firebaseio.com/", None
 )
 
+# load data dan bagi data
+data1 = pd.read_csv("dataset.csv")
+data2 = pd.read_csv("test data.csv")
 
 # Bagi dataset 80:20
 train_data = data1.copy()
 test_data = data2.copy()
-
-# question node
 
 
 class CreateQuestion:
@@ -43,9 +32,6 @@ class CreateQuestion:
 
     def __repr__(self):
         return "Is %s >= %s?" % (self.column, str(self.value))
-
-
-# Decision tree class
 
 
 class DecisionTree:
@@ -137,24 +123,6 @@ class DecisionTree:
             predictions.append(self.predict_instance(instance, self.tree))
         return predictions
 
-    # def print_rules(self, node=None, condition='', rules_data=None):
-    #     if node is None:
-    #         node = self.tree
-
-    #     if rules_data is None:
-    #         rules_data = []
-
-    #     if 'label' in node:
-    #         rules_data.append({'Condition': condition, 'Label': node['label']})
-    #         return
-
-    #     attribute = node['attribute']
-    #     for value, child_node in node['children'].items():
-    #         child_condition = f"{attribute} = {value}"
-    #         self.print_rules(child_node, condition +
-    #                          child_condition, rules_data)
-
-    #     return rules_data
     def print_rules(self, node=None, rules_data=None, current_rule=None):
         if node is None:
             node = self.tree
@@ -205,9 +173,6 @@ class DecisionTree:
         return tree_data
 
 
-# akurasi
-
-
 def calculate_accuracy(predictions, labels):
     correct_count = sum(predictions == labels)
     total_count = len(predictions)
@@ -244,22 +209,6 @@ def precision(cm, label_idx):
         else 0
     )
     return precision_value
-
-
-timeloc = pytz.timezone("Asia/Jakarta")
-
-
-def generate_new_data():
-    current_time = datetime.datetime.now(tz=timeloc).time()
-    new_data = pd.DataFrame({"Waktu": [current_time]})
-    new_data["Waktu"] = new_data["Waktu"].apply(lambda x: x.hour * 60 + x.minute)
-    return new_data
-
-
-# def generate_new_data():
-#     current_time = datetime.datetime.now(tz=timeloc).strftime("%H:%M:%S")
-#     new_data = pd.DataFrame({'Waktu': [current_time]})
-#     return new_data
 
 
 # Membangun pohon keputusan C5.0 untuk setiap ruangan
@@ -346,34 +295,9 @@ for column in ["kamar", "kamar2", "teras", "dapur", "toilet", "ruangtamu"]:
         precision_values.append(p)
 
         print("Label: {} ({})".format(label, column))
-        print("Recall: {:.2f} %".format(r * 100))
-        print("Precision: {:.2f} %".format(p * 100))
+        print("Recall: {:.2f}".format(r))
+        print("Precision: {:.2f}".format(p))
         print()
-
-        accuracy = calculate_accuracy(y_pred, y_test)
-        precision_value_avg = np.mean(precision_values)
-        recall_value_avg = np.mean(recall_values)
-
-    # Membuat struktur data untuk confusion matrix dan informasi lainnya
-    # data = {
-    #     "confusion_matrix": {"matrix": cm.tolist(), "labels": labels.tolist()},
-    #     "label_1": {"recall": recall_values[0], "precision": precision_values[0]},
-    #     "label_2": {"recall": recall_values[1], "precision": precision_values[1]},
-    # }
-    data = {
-        "confussion_matrix": cm.tolist(),
-        "accuracy": "{:.2f}%".format(accuracy * 100),
-        "recall": "{:.2f}%".format(recall_value_avg * 100),
-        "precision": "{:.2f}%".format(precision_value_avg * 100),
-    }
-    # Menyimpan data ke Firebase
-    # Sesuaikan dengan struktur Firebase Anda
-    path = f"/confusion_matrix/{column}"
-    response = firebaseApp.put(path, "/", data)
-
-    print(f"Informasi ({column}) berhasil disimpan di Firebase dengan path: {path}")
-    print(response)
-    print()
 
 
 def convert_to_python_int(data):
@@ -387,6 +311,16 @@ def convert_to_python_int(data):
         return data
 
 
+timeloc = pytz.timezone("Asia/Jakarta")
+
+
+def generate_new_data():
+    current_time = datetime.datetime.now(tz=timeloc).time()
+    new_data = pd.DataFrame({"Waktu": [current_time]})
+    new_data["Waktu"] = new_data["Waktu"].apply(lambda x: x.hour * 60 + x.minute)
+    return new_data
+
+
 # Mencetak rules untuk setiap ruangan dan menggabungkannya menjadi satu data
 rules_data = {
     "kamar": convert_to_python_int(decision_tree_kamar.print_rules()),
@@ -397,43 +331,37 @@ rules_data = {
     "ruangtamu": convert_to_python_int(decision_tree_ruangtamu.print_rules()),
 }
 
-# Kirim data aturan ke Firebase Realtime Database
-firebaseApp.put("/rules", "/", rules_data)
+print(rules_data)
 
-print(type(train_data))
-print(type(test_data))
+tree_kamar = decision_tree_kamar.print_tree()
+print("Pohon Keputusan Kamar:")
+print(tree_kamar)
+print()
 
+tree_kamar2 = decision_tree_kamar2.print_tree()
+print("Pohon Keputusan Kamar2:")
+print(tree_kamar2)
+print()
 
-# tree_kamar = decision_tree_kamar.print_tree()
-# print("Pohon Keputusan Kamar:")
-# print(tree_kamar)
-# print()
+tree_teras = decision_tree_teras.print_tree()
+print("Pohon Keputusan Teras:")
+print(tree_teras)
+print()
 
-# tree_kamar2 = decision_tree_kamar2.print_tree()
-# print("Pohon Keputusan Kamar2:")
-# print(tree_kamar2)
-# print()
+tree_dapur = decision_tree_dapur.print_tree()
+print("Pohon Keputusan Dapur:")
+print(tree_dapur)
+print()
 
-# tree_teras = decision_tree_teras.print_tree()
-# print("Pohon Keputusan Teras:")
-# print(tree_teras)
-# print()
+tree_toilet = decision_tree_toilet.print_tree()
+print("Pohon Keputusan Toilet:")
+print(tree_toilet)
+print()
 
-# tree_dapur = decision_tree_dapur.print_tree()
-# print("Pohon Keputusan Dapur:")
-# print(tree_dapur)
-# print()
-
-# tree_toilet = decision_tree_toilet.print_tree()
-# print("Pohon Keputusan Toilet:")
-# print(tree_toilet)
-# print()
-
-# tree_ = decision_tree_ruangtamu.print_tree()
-# print("Pohon Keputusan RuangTamu:")
-# print(tree_)
-# print()
-
+tree_ = decision_tree_ruangtamu.print_tree()
+print("Pohon Keputusan RuangTamu:")
+print(tree_)
+print()
 
 app = Flask(__name__)
 CORS(app)
@@ -489,20 +417,6 @@ def get_accuracy_all_rooms():
     return jsonify(accuracies)
 
 
-# helper
-
-
-# def convert_to_python_int(data):
-#     if isinstance(data, np.int64) or isinstance(data, np.int32):
-#         return int(data)
-#     elif isinstance(data, dict):
-#         return {key: convert_to_python_int(value) for key, value in data.items()}
-#     elif isinstance(data, list):
-#         return [convert_to_python_int(item) for item in data]
-#     else:
-#         return data
-
-
 @app.route("/api/rules")
 def get_rules_all_rooms():
     rules = {
@@ -516,7 +430,6 @@ def get_rules_all_rooms():
     return jsonify(rules)
 
 
-# Endpoint to display accuracy, precision, recall, and decision tree rules for each room
 @app.route("/api/result")
 def show_result():
     result = {}
@@ -553,12 +466,8 @@ def show_result():
 
         result[column] = {
             "accuracy": "{:.2f}%".format(accuracy * 100),
-            # "precision on": "{:.2f} %".format(precision_values[0]),
-            # "precision off": "{:.2f} %".format(precision_values[1]),
-            # "recall on": "{:.2f}".format(recall_values[0]),
-            # "recall off": "{:.2f}".format(recall_values[1]),
-            "precision_avg": "{:.2f}%".format(precision_value_avg * 100),
-            "recall_avg": "{:.2f}%".format(recall_value_avg * 100),
+            "precision": "{:.2f}%".format(precision_value_avg * 100),
+            "recall": "{:.2f}%".format(recall_value_avg * 100),
         }
 
     return jsonify(result=result)
@@ -595,96 +504,6 @@ def classify_new_data():
             response[column] = "hidup" if predictions[0] == 2 else "mati"
 
     return jsonify(response)
-
-
-@app.route("/api/status/kamar")
-def classify_kamar():
-    new_data = generate_new_data()
-    decision_tree = decision_tree_kamar
-    if decision_tree:
-        predictions = decision_tree.predict(new_data[["Waktu"]])
-        return str(1 if predictions[0] == 1 else 2)
-
-
-@app.route("/api/status/kamar2")
-def classify_kamar2():
-    new_data = generate_new_data()
-    decision_tree = decision_tree_kamar2
-    if decision_tree:
-        predictions = decision_tree.predict(new_data[["Waktu"]])
-        return str(1 if predictions[0] == 1 else 2)
-
-
-@app.route("/api/status/teras")
-def classify_teras():
-    new_data = generate_new_data()
-    decision_tree = decision_tree_teras
-    if decision_tree:
-        predictions = decision_tree.predict(new_data[["Waktu"]])
-        return str(1 if predictions[0] == 1 else 2)
-
-
-@app.route("/api/status/dapur")
-def classify_dapur():
-    new_data = generate_new_data()
-    decision_tree = decision_tree_dapur
-    if decision_tree:
-        predictions = decision_tree.predict(new_data[["Waktu"]])
-        return str(1 if predictions[0] == 1 else 2)
-
-
-@app.route("/api/status/toilet")
-def classify_toilet():
-    new_data = generate_new_data()
-    decision_tree = decision_tree_toilet
-    if decision_tree:
-        predictions = decision_tree.predict(new_data[["Waktu"]])
-        return str(1 if predictions[0] == 1 else 2)
-
-
-@app.route("/api/status/ruangtamu")
-def classify_ruangtamu():
-    new_data = generate_new_data()
-    decision_tree = decision_tree_ruangtamu
-    if decision_tree:
-        predictions = decision_tree.predict(new_data[["Waktu"]])
-        return str(1 if predictions[0] == 1 else 2)
-
-
-@app.route("/api/rules/kamar")
-def get_rules_kamar():
-    rules = {"kamar": convert_to_python_int(decision_tree_kamar.print_rules())}
-    return jsonify(rules=rules)
-
-
-@app.route("/api/rules/kamar2")
-def get_rules_kamar2():
-    rules = {"kamar2": convert_to_python_int(decision_tree_kamar2.print_rules())}
-    return jsonify(rules=rules)
-
-
-@app.route("/api/rules/teras")
-def get_rules_teras():
-    rules = {"teras": convert_to_python_int(decision_tree_teras.print_rules())}
-    return jsonify(rules=rules)
-
-
-@app.route("/api/rules/dapur")
-def get_rules_dapur():
-    rules = {"dapur": convert_to_python_int(decision_tree_dapur.print_rules())}
-    return jsonify(rules=rules)
-
-
-@app.route("/api/rules/toilet")
-def get_rules_toilet():
-    rules = {"toilet": convert_to_python_int(decision_tree_toilet.print_rules())}
-    return jsonify(rules=rules)
-
-
-@app.route("/api/rules/ruangtamu")
-def get_rules_ruangtamu():
-    rules = {"ruangtamu": convert_to_python_int(decision_tree_ruangtamu.print_rules())}
-    return jsonify(rules=rules)
 
 
 @app.route("/api/train", methods=["POST"])
