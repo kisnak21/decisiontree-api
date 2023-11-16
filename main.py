@@ -346,8 +346,8 @@ for column in ["kamar", "kamar2", "teras", "dapur", "toilet", "ruangtamu"]:
         precision_values.append(p)
 
         print("Label: {} ({})".format(label, column))
-        print("Recall: {:.2f} %".format(r * 100))
-        print("Precision: {:.2f} %".format(p * 100))
+        print("Recall: {:.0%} ".format(r))
+        print("Precision: {:.0%} ".format(p))
         print()
 
         accuracy = calculate_accuracy(y_pred, y_test)
@@ -362,9 +362,9 @@ for column in ["kamar", "kamar2", "teras", "dapur", "toilet", "ruangtamu"]:
     # }
     data = {
         "confussion_matrix": cm.tolist(),
-        "accuracy": "{:.2f}%".format(accuracy * 100),
-        "recall": "{:.2f}%".format(recall_value_avg * 100),
-        "precision": "{:.2f}%".format(precision_value_avg * 100),
+        "accuracy": "{:.0%}".format(accuracy),
+        "recall": "{:.0%}".format(recall_value_avg),
+        "precision": "{:.0%}".format(precision_value_avg),
     }
     # Menyimpan data ke Firebase
     # Sesuaikan dengan struktur Firebase Anda
@@ -543,8 +543,8 @@ def show_result():
             precision_values.append(p)
 
             print("Label: {} ({})".format(label, column))
-            print("Recall: {:.2f}%".format(r * 100))
-            print("Precision: {:.2f}%".format(p * 100))
+            print("Recall: {:.0%}%".format(r))
+            print("Precision: {:.0%}%".format(p))
             print()
 
         accuracy = calculate_accuracy(y_pred, y_test)
@@ -552,13 +552,13 @@ def show_result():
         recall_value_avg = np.mean(recall_values)
 
         result[column] = {
-            "accuracy": "{:.2f}%".format(accuracy * 100),
-            # "precision on": "{:.2f} %".format(precision_values[0]),
-            # "precision off": "{:.2f} %".format(precision_values[1]),
-            # "recall on": "{:.2f}".format(recall_values[0]),
-            # "recall off": "{:.2f}".format(recall_values[1]),
-            "precision_avg": "{:.2f}%".format(precision_value_avg * 100),
-            "recall_avg": "{:.2f}%".format(recall_value_avg * 100),
+            "accuracy": "{:.0%}".format(accuracy),
+            # "precision on": "{:.0%} %".format(precision_values[0]),
+            # "precision off": "{:.0%} %".format(precision_values[1]),
+            # "recall on": "{:.0%}".format(recall_values[0]),
+            # "recall off": "{:.0%}".format(recall_values[1]),
+            "precision_avg": "{:.0%}".format(precision_value_avg),
+            "recall_avg": "{:.0%}".format(recall_value_avg),
         }
 
     return jsonify(result=result)
