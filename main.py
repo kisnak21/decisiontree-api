@@ -256,12 +256,6 @@ def generate_new_data():
     return new_data
 
 
-# def generate_new_data():
-#     current_time = datetime.datetime.now(tz=timeloc).strftime("%H:%M:%S")
-#     new_data = pd.DataFrame({'Waktu': [current_time]})
-#     return new_data
-
-
 # Membangun pohon keputusan C5.0 untuk setiap ruangan
 decision_tree_kamar = DecisionTree()
 decision_tree_kamar.fit(train_data[["Waktu"]], train_data["kamar"])
@@ -354,12 +348,6 @@ for column in ["kamar", "kamar2", "teras", "dapur", "toilet", "ruangtamu"]:
         precision_value_avg = np.mean(precision_values)
         recall_value_avg = np.mean(recall_values)
 
-    # Membuat struktur data untuk confusion matrix dan informasi lainnya
-    # data = {
-    #     "confusion_matrix": {"matrix": cm.tolist(), "labels": labels.tolist()},
-    #     "label_1": {"recall": recall_values[0], "precision": precision_values[0]},
-    #     "label_2": {"recall": recall_values[1], "precision": precision_values[1]},
-    # }
     data = {
         "confussion_matrix": cm.tolist(),
         "accuracy": "{:.0%}".format(accuracy),
@@ -489,20 +477,6 @@ def get_accuracy_all_rooms():
     return jsonify(accuracies)
 
 
-# helper
-
-
-# def convert_to_python_int(data):
-#     if isinstance(data, np.int64) or isinstance(data, np.int32):
-#         return int(data)
-#     elif isinstance(data, dict):
-#         return {key: convert_to_python_int(value) for key, value in data.items()}
-#     elif isinstance(data, list):
-#         return [convert_to_python_int(item) for item in data]
-#     else:
-#         return data
-
-
 @app.route("/api/rules")
 def get_rules_all_rooms():
     rules = {
@@ -595,96 +569,6 @@ def classify_new_data():
             response[column] = "hidup" if predictions[0] == 2 else "mati"
 
     return jsonify(response)
-
-
-@app.route("/api/status/kamar")
-def classify_kamar():
-    new_data = generate_new_data()
-    decision_tree = decision_tree_kamar
-    if decision_tree:
-        predictions = decision_tree.predict(new_data[["Waktu"]])
-        return str(1 if predictions[0] == 1 else 2)
-
-
-@app.route("/api/status/kamar2")
-def classify_kamar2():
-    new_data = generate_new_data()
-    decision_tree = decision_tree_kamar2
-    if decision_tree:
-        predictions = decision_tree.predict(new_data[["Waktu"]])
-        return str(1 if predictions[0] == 1 else 2)
-
-
-@app.route("/api/status/teras")
-def classify_teras():
-    new_data = generate_new_data()
-    decision_tree = decision_tree_teras
-    if decision_tree:
-        predictions = decision_tree.predict(new_data[["Waktu"]])
-        return str(1 if predictions[0] == 1 else 2)
-
-
-@app.route("/api/status/dapur")
-def classify_dapur():
-    new_data = generate_new_data()
-    decision_tree = decision_tree_dapur
-    if decision_tree:
-        predictions = decision_tree.predict(new_data[["Waktu"]])
-        return str(1 if predictions[0] == 1 else 2)
-
-
-@app.route("/api/status/toilet")
-def classify_toilet():
-    new_data = generate_new_data()
-    decision_tree = decision_tree_toilet
-    if decision_tree:
-        predictions = decision_tree.predict(new_data[["Waktu"]])
-        return str(1 if predictions[0] == 1 else 2)
-
-
-@app.route("/api/status/ruangtamu")
-def classify_ruangtamu():
-    new_data = generate_new_data()
-    decision_tree = decision_tree_ruangtamu
-    if decision_tree:
-        predictions = decision_tree.predict(new_data[["Waktu"]])
-        return str(1 if predictions[0] == 1 else 2)
-
-
-@app.route("/api/rules/kamar")
-def get_rules_kamar():
-    rules = {"kamar": convert_to_python_int(decision_tree_kamar.print_rules())}
-    return jsonify(rules=rules)
-
-
-@app.route("/api/rules/kamar2")
-def get_rules_kamar2():
-    rules = {"kamar2": convert_to_python_int(decision_tree_kamar2.print_rules())}
-    return jsonify(rules=rules)
-
-
-@app.route("/api/rules/teras")
-def get_rules_teras():
-    rules = {"teras": convert_to_python_int(decision_tree_teras.print_rules())}
-    return jsonify(rules=rules)
-
-
-@app.route("/api/rules/dapur")
-def get_rules_dapur():
-    rules = {"dapur": convert_to_python_int(decision_tree_dapur.print_rules())}
-    return jsonify(rules=rules)
-
-
-@app.route("/api/rules/toilet")
-def get_rules_toilet():
-    rules = {"toilet": convert_to_python_int(decision_tree_toilet.print_rules())}
-    return jsonify(rules=rules)
-
-
-@app.route("/api/rules/ruangtamu")
-def get_rules_ruangtamu():
-    rules = {"ruangtamu": convert_to_python_int(decision_tree_ruangtamu.print_rules())}
-    return jsonify(rules=rules)
 
 
 @app.route("/api/train", methods=["POST"])
