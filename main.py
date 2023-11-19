@@ -446,35 +446,25 @@ decision_tree_ruangtamu = DecisionTree()
 decision_tree_ruangtamu.fit(train_data[["Waktu"]], train_data["ruangtamu"])
 
 
-@app.route("/api/accuracy")
-def get_accuracy_all_rooms():
-    accuracies = {
-        "kamar": calculate_accuracy(
-            decision_tree_kamar.predict(test_data_kamar[["Waktu"]]),
-            test_data_kamar["kamar"],
-        ),
-        "kamar2": calculate_accuracy(
-            decision_tree_kamar2.predict(test_data_kamar2[["Waktu"]]),
-            test_data_kamar2["kamar2"],
-        ),
-        "teras": calculate_accuracy(
-            decision_tree_teras.predict(test_data_teras[["Waktu"]]),
-            test_data_teras["teras"],
-        ),
-        "dapur": calculate_accuracy(
-            decision_tree_dapur.predict(test_data_dapur[["Waktu"]]),
-            test_data_dapur["dapur"],
-        ),
-        "toilet": calculate_accuracy(
-            decision_tree_toilet.predict(test_data_toilet[["Waktu"]]),
-            test_data_toilet["toilet"],
-        ),
-        "ruangtamu": calculate_accuracy(
-            decision_tree_ruangtamu.predict(test_data_ruangtamu[["Waktu"]]),
-            test_data_ruangtamu["ruangtamu"],
-        ),
-    }
-    return jsonify(accuracies)
+@app.route("/api/evaluasi")
+def evaluasi():
+    TP = 157
+    TN = 130
+    FP = 0
+    FN = 1
+
+    accuracy = (TP + TN) / (TP + TN + FP + FN)
+    precision = TP / (TP + FP)
+    recall = TP / (TP + FN)
+    missclasify = (FP + FN) / (TP + TN + FP + FN)
+    return jsonify(
+        {
+            "accuracy": "{:.2f}%".format(accuracy * 100),
+            "precision": "{:.0%}".format(precision),
+            "recall": "{:.2f}%".format(recall * 100),
+            "missclasify": "{:.2f}%".format(missclasify * 100),
+        }
+    )
 
 
 @app.route("/api/rules")
