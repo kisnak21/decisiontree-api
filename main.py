@@ -448,19 +448,19 @@ decision_tree_ruangtamu.fit(train_data[["Waktu"]], train_data["ruangtamu"])
 
 @app.route("/api/evaluasi")
 def evaluasi():
-    TP = 157
-    TN = 130
-    FP = 0
-    FN = 1
+    TP = 129
+    TN = 155
+    FP = 2
+    FN = 2
 
     accuracy = (TP + TN) / (TP + TN + FP + FN)
-    precision = TP / (TP + FP)
+    precision = TP / (FP + TP)
     recall = TP / (TP + FN)
     missclasify = (FP + FN) / (TP + TN + FP + FN)
     return jsonify(
         {
             "accuracy": "{:.2f}%".format(accuracy * 100),
-            "precision": "{:.0%}".format(precision),
+            "precision": "{:.2f}%".format(precision * 100),
             "recall": "{:.2f}%".format(recall * 100),
             "missclasify": "{:.2f}%".format(missclasify * 100),
         }
